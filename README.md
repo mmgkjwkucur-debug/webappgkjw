@@ -20,6 +20,22 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Deploy Biasa ke Firebase Hosting
+
+Project ini dikonfigurasi sebagai static export dengan `next.config.ts` menggunakan `output: "export"`.
+
+Untuk deploy biasa ke Firebase Hosting klasik:
+
+```bash
+npm run build
+npx -y firebase-tools deploy --only hosting
+```
+
+Catatan:
+- Situs statis akan berjalan normal di Firebase Hosting.
+- API route seperti `/api/ai` tidak akan berfungsi pada setup ini karena tidak ada server Next.js di belakangnya.
+- Jika ingin menambahkan backend AI di masa depan, perlu menggunakan Firebase App Hosting atau platform server-side lain.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

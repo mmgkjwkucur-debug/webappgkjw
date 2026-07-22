@@ -1,0 +1,253 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUserData() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+
+    function userHasRole(targetRole) {
+      let data = currentUserData();
+      return data != null
+        && (
+          data.role == targetRole
+          || data.role == "admin"
+          || (
+            "roles" in data
+            && data.roles is list
+            && (
+              targetRole in data.roles
+              || "admin" in data.roles
+            )
+          )
+        );
+    }
+
+    function isMultimediaAdmin() {
+      return userHasRole("admin") || userHasRole("multi_media");
+    }
+
+    function isStaff() {
+      return userHasRole("admin")
+        || userHasRole("sekretariat")
+        || userHasRole("bendahara")
+        || userHasRole("phmj")
+        || userHasRole("majelis")
+        || userHasRole("multi_media");
+    }
+
+    function isUserManager() {
+      return userHasRole("admin");
+    }
+
+    function hasValidRoles(data) {
+      return data.roles is list
+        && data.roles.size() >= 1
+        && data.roles.size() <= 6
+        && data.roles.hasOnly(["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"])
+        && data.role is string
+        && data.role in data.roles
+        && (!("menuAccess" in data) || (data.menuAccess is list && data.menuAccess.size() <= 50));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(["nama", "email", "roles", "role", "menuAccess", "status", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["nama", "email", "roles", "role", "status", "createdAt", "updatedAt"])
+        && data.nama is string
+        && data.email is string
+        && data.status in ["active", "inactive"]
+        && data.createdAt is string
+        && data.updatedAt is string
+        && data.nama.size() >= 2
+        && data.nama.size() <= 120
+        && data.email.size() >= 5
+        && data.email.size() <= 180
+        && data.createdAt.size() <= 40
+        && data.updatedAt.size() <= 40
+        && hasValidRoles(data);
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasOnly(["judul", "ringkasan", "isi", "status", "tanggal", "authorRole"])
+        && data.keys().hasAll(["judul", "ringkasan", "isi", "status", "tanggal", "authorRole"])
+        && data.judul is string
+        && data.ringkasan is string
+        && data.isi is string
+        && data.status in ["draft", "published"]
+        && data.tanggal is string
+        && data.authorRole is string
+        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
+        && data.judul.size() >= 3
+        && data.judul.size() <= 120
+        && data.ringkasan.size() <= 280
+        && data.isi.size() <= 12000
+        && data.tanggal.size() <= 40;
+    }
+
+    function isValidSchedule(data) {
+      return data.keys().hasOnly(["judul", "tanggal", "waktu", "lokasi", "pelayan", "catatan", "isPublic", "authorRole"])
+        && data.keys().hasAll(["judul", "tanggal", "waktu", "lokasi", "isPublic", "authorRole"])
+        && data.judul is string
+        && data.tanggal is string
+        && data.waktu is string
+        && data.lokasi is string
+        && data.isPublic is bool
+        && data.authorRole is string
+        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
+        && (!("pelayan" in data) || data.pelayan is string)
+        && (!("catatan" in data) || data.catatan is string)
+        && data.judul.size() >= 3
+        && data.judul.size() <= 120
+        && data.tanggal.size() <= 20
+        && data.waktu.size() <= 20
+        && data.lokasi.size() <= 160
+        && (!("pelayan" in data) || data.pelayan.size() <= 160)
+        && (!("catatan" in data) || data.catatan.size() <= 600);
+    }
+
+    function isValidRenungan(data) {
+      return data.keys().hasOnly(["judul", "isi", "tanggal", "authorRole", "createdAt", "updatedAt"]) 
+        && data.keys().hasAll(["judul", "isi", "tanggal", "authorRole", "createdAt", "updatedAt"]) 
+        && data.judul is string
+        && data.isi is string
+        && data.tanggal is string
+        && data.authorRole is string
+        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
+        && data.createdAt is string
+        && data.updatedAt is string
+        && data.judul.size() >= 3
+        && data.judul.size() <= 200
+        && data.isi.size() >= 3
+        && data.isi.size() <= 12000
+        && data.tanggal.size() <= 40
+        && data.createdAt.size() <= 40
+        && data.updatedAt.size() <= 40;
+    }
+
+    function isValidBukuInduk(data) {
+      return data.keys().hasOnly(["nama", "nama_lengkap", "status_keanggotaan", "gereja_asal", "gereja_tujuan", "tanggal_atestasi", "tanggal_meninggal", "nomor_surat_atestasi", "tempat_dimakamkan", "keterangan", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["status_keanggotaan", "createdAt", "updatedAt"])
+        && data.status_keanggotaan is string
+        && data.status_keanggotaan in ["Aktif", "Atestasi Keluar", "Meninggal"]
+        && data.createdAt is string
+        && data.updatedAt is string
+        && (!("nama" in data) || data.nama is string)
+        && (!("nama_lengkap" in data) || data.nama_lengkap is string)
+        && (!("gereja_asal" in data) || data.gereja_asal is string)
+        && (!("gereja_tujuan" in data) || data.gereja_tujuan is string)
+        && (!("tanggal_atestasi" in data) || data.tanggal_atestasi is string)
+        && (!("tanggal_meninggal" in data) || data.tanggal_meninggal is string)
+        && (!("nomor_surat_atestasi" in data) || data.nomor_surat_atestasi is string)
+        && (!("tempat_dimakamkan" in data) || data.tempat_dimakamkan is string)
+        && (!("keterangan" in data) || data.keterangan is string);
+    }
+
+    function isValidMutasi(data) {
+      return data.keys().hasOnly(["jenis_mutasi", "jemaat_id", "jemaat_nama", "gereja_asal", "gereja_tujuan", "tanggal_atestasi", "tanggal_meninggal", "nomor_surat_atestasi", "tempat_dimakamkan", "keterangan", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["jenis_mutasi", "createdAt", "updatedAt"])
+        && data.jenis_mutasi is string
+        && data.jenis_mutasi in ["atestasi_masuk", "atestasi_keluar", "meninggal"]
+        && data.createdAt is string
+        && data.updatedAt is string
+        && (!("jemaat_id" in data) || data.jemaat_id is string)
+        && (!("jemaat_nama" in data) || data.jemaat_nama is string)
+        && (!("gereja_asal" in data) || data.gereja_asal is string)
+        && (!("gereja_tujuan" in data) || data.gereja_tujuan is string)
+        && (!("tanggal_atestasi" in data) || data.tanggal_atestasi is string)
+        && (!("tanggal_meninggal" in data) || data.tanggal_meninggal is string)
+        && (!("nomor_surat_atestasi" in data) || data.nomor_surat_atestasi is string)
+        && (!("tempat_dimakamkan" in data) || data.tempat_dimakamkan is string)
+        && (!("keterangan" in data) || data.keterangan is string);
+    }
+
+    function isValidPublicMenu(data) {
+      return data.keys().hasOnly(["label", "slug", "parentId", "order", "status", "pageTitle", "pageSummary", "pageContent", "ctaLabel", "ctaUrl", "createdAt", "updatedAt", "authorRole"])
+        && data.keys().hasAll(["label", "slug", "parentId", "order", "status", "pageTitle", "pageSummary", "pageContent", "ctaLabel", "ctaUrl", "createdAt", "updatedAt", "authorRole"])
+        && data.label is string
+        && data.slug is string
+        && data.parentId is string
+        && data.order is number
+        && data.status in ["draft", "published"]
+        && data.pageTitle is string
+        && data.pageSummary is string
+        && data.pageContent is string
+        && data.ctaLabel is string
+        && data.ctaUrl is string
+        && data.createdAt is string
+        && data.updatedAt is string
+        && data.authorRole is string
+        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
+        && data.label.size() >= 2
+        && data.label.size() <= 80
+        && data.slug.size() >= 2
+        && data.slug.size() <= 100
+        && data.parentId.size() <= 120
+        && data.order >= 0
+        && data.order <= 999
+        && data.pageTitle.size() >= 3
+        && data.pageTitle.size() <= 140
+        && data.pageSummary.size() >= 3
+        && data.pageSummary.size() <= 320
+        && data.pageContent.size() >= 3
+        && data.pageContent.size() <= 12000
+        && data.ctaLabel.size() <= 80
+        && data.ctaUrl.size() <= 240
+        && data.createdAt.size() <= 40
+        && data.updatedAt.size() <= 40;
+    }
+
+    match /users/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || userHasRole("admin"));
+      allow list: if signedIn() && userHasRole("admin");
+      allow create, update: if signedIn() && userHasRole("admin") && isValidUser(request.resource.data);
+      allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /posts/{postId} {
+      allow read: if resource.data.status == "published" || isStaff();
+      allow create, update: if isMultimediaAdmin() && isValidPost(request.resource.data);
+      allow delete: if isMultimediaAdmin();
+    }
+
+    match /jadwal/{scheduleId} {
+      allow read: if resource.data.isPublic == true || isStaff();
+      allow create, update: if isMultimediaAdmin() && isValidSchedule(request.resource.data);
+      allow delete: if isMultimediaAdmin();
+    }
+
+    match /publicMenus/{menuId} {
+      allow read: if resource.data.status == "published" || isStaff();
+      allow create, update: if isMultimediaAdmin() && isValidPublicMenu(request.resource.data);
+      allow delete: if isMultimediaAdmin();
+    }
+
+    match /renungan/{id} {
+      allow read: if true;
+      allow create, update: if isMultimediaAdmin() && isValidRenungan(request.resource.data);
+      allow delete: if isMultimediaAdmin();
+    }
+
+    match /buku_induk/{memberId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create, update: if signedIn() && isStaff() && isValidBukuInduk(request.resource.data);
+      allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /mutasi/{mutasiId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create, update: if signedIn() && isStaff() && isValidMutasi(request.resource.data);
+      allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /jemaat/{memberId} {
+      allow read, write: if userHasRole("admin") || userHasRole("sekretariat") || userHasRole("phmj") || userHasRole("majelis");
+    }
+  }
+}
