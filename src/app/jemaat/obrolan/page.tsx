@@ -200,8 +200,8 @@ export default function JemaatChatPage() {
       </div>
       {errorMessage && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div>}
 
-      <div className="grid min-h-[34rem] overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white shadow-sm lg:grid-cols-[19rem_1fr]">
-        <aside className={`${showRoomListOnMobile ? "flex" : "hidden"} min-h-[34rem] flex-col border-b border-emerald-950/10 bg-[#fffdf7] p-4 lg:flex lg:border-b-0 lg:border-r`}>
+      <div className="grid h-[72dvh] max-h-[48rem] min-h-[34rem] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white shadow-sm lg:grid-cols-[19rem_1fr]">
+        <aside className={`${showRoomListOnMobile ? "flex" : "hidden"} min-h-0 flex-col border-b border-emerald-950/10 bg-[#fffdf7] p-4 lg:flex lg:border-b-0 lg:border-r`}>
           <div className="flex items-center justify-between px-2 py-2">
             <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Daftar percakapan</p><h2 className="mt-1 font-serif text-xl">Grup jemaat <span className="font-sans text-sm text-emerald-950/45">({rooms.length})</span></h2></div>
             <MessagesSquare className="text-amber-600" size={21} />
@@ -213,7 +213,7 @@ export default function JemaatChatPage() {
           <div className="mt-3 flex gap-2" aria-label="Filter grup">
             {([ ["all", "Semua"], ["public", "Terbuka"], ["private", "Privat"] ] as const).map(([filter, label]) => <button key={filter} type="button" onClick={() => setRoomFilter(filter)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${roomFilter === filter ? "bg-emerald-900 text-white" : "bg-emerald-950/5 text-emerald-950/65 hover:bg-emerald-950/10"}`}>{label}</button>)}
           </div>
-          <div className="mt-4 flex-1 space-y-2 overflow-y-auto">
+          <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
             {visibleRooms.map((room) => {
               const isSelected = selectedRoomId === room.id;
               const memberCount = Object.keys(room.memberIds || {}).length;
@@ -236,7 +236,7 @@ export default function JemaatChatPage() {
           </div>
         </aside>
 
-        <div className={`${showRoomListOnMobile ? "hidden" : "flex"} min-h-[34rem] flex-col lg:flex`}>
+        <div className={`${showRoomListOnMobile ? "hidden" : "flex"} min-h-0 flex-col lg:flex`}>
           <header className="border-b border-emerald-950/10 px-4 py-4 sm:px-5">
             <div className="flex items-start gap-3">
               <button type="button" onClick={() => setShowRoomListOnMobile(true)} className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-950/10 text-emerald-900 lg:hidden" aria-label="Kembali ke daftar grup"><ArrowLeft size={18} /></button>
@@ -247,7 +247,7 @@ export default function JemaatChatPage() {
               {selectedRoom?.createdBy === user?.uid && <button type="button" onClick={() => { if (selectedRoom) void deleteRoom(selectedRoom); }} className="shrink-0 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50">Hapus</button>}
             </div>
             {selectedRoom?.createdBy === user?.uid && !selectedRoom?.isPublic && <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="email" list="jemaat-members" required value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-emerald-500" placeholder="Pilih atau ketik email jemaat" /><datalist id="jemaat-members">{jemaatMembers.map((member) => <option key={member.uid} value={member.email}>{member.nama}</option>)}</datalist><button type="submit" className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Tambah anggota</button></form>}</header>
-          <div className="flex-1 space-y-4 overflow-y-auto bg-[#f7f5ef] p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[#f7f5ef] p-5">
             {messages.map((message) => {
               const isMine = message.senderId === user?.uid;
               return <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${isMine ? "rounded-br-md bg-emerald-900 text-white" : "rounded-bl-md bg-white text-emerald-950"}`}><div className={`mb-1 text-xs font-bold ${isMine ? "text-emerald-100/70" : "text-emerald-800/60"}`}>{isMine ? "Anda" : message.senderName} · {formatTime(message.createdAt)}</div><p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p></div></div>;
