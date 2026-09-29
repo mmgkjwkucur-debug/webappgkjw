@@ -54,9 +54,10 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasOnly(["nama", "email", "roles", "role", "menuAccess", "status", "createdAt", "updatedAt"])
+      return data.keys().hasOnly(["nama", "username", "email", "roles", "role", "menuAccess", "status", "createdAt", "updatedAt"])
         && data.keys().hasAll(["nama", "email", "roles", "role", "status", "createdAt", "updatedAt"])
         && data.nama is string
+        && (!('username' in data) || (data.username is string && data.username.matches('^[a-z0-9._-]{3,40}$')))
         && data.email is string
         && data.status in ["active", "inactive"]
         && data.createdAt is string

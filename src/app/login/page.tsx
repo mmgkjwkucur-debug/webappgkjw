@@ -39,7 +39,7 @@ function getAuthErrorMessage(error: unknown) {
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      let loginEmail = identifier.trim();
+      if (!loginEmail.includes("@")) {
+        const usernameResponse = await fetch("/api/auth/resolve-username", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: loginEmail }),
+        });
+        const usernameBody = await usernameResponse.json().catch(() => ({}));
+        if (!usernameResponse.ok || typeof usernameBody.email !== "string") {
+          throw new Error(usernameBody.error || "Username atau password salah.");
+        }
+        loginEmail = usernameBody.email;
+      }
+
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
       const idToken = await userCredential.user.getIdToken();
 
       const sessionResponse = await fetch("/api/session", {
@@ -107,11 +121,12 @@ export default function LoginPage() {
             <label className="text-sm font-semibold text-slate-700">Email</label>
             <input
               className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-              type="email"
-              name="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              name="identifier"
+              autoComplete="username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Username atau email"
               required
             />
           </div>

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { initializeApp, getApp, getApps, deleteApp } from "firebase/app";
 import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { collection, deleteDoc, getDoc, getDocs, query, setDoc, where, doc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, getDoc, getDocs, limit, query, setDoc, where, doc, updateDoc } from "firebase/firestore";
 import { auth, db, firebaseConfig } from "@/lib/firebase";
 import { DEFAULT_ROLE_MENU_ACCESS, MENU_OPTIONS, ROLE_OPTIONS, UserRole, getRoleLabel, normalizeMenuPaths, normalizeRoles } from "@/lib/roles";
 import { adminUi as styles } from "../ui";
@@ -10,6 +10,7 @@ import { adminUi as styles } from "../ui";
 type ManagedUser = {
   id: string;
   nama: string;
+  username: string;
   email: string;
   roles: UserRole[];
   menuAccess: string[];
@@ -73,6 +74,7 @@ async function fetchManagedUsers() {
     return {
       id: item.id,
       nama: typeof data.nama === "string" ? data.nama : "-",
+      username: typeof data.username === "string" ? data.username : "-",
       email: typeof data.email === "string" ? data.email : "-",
       roles,
       menuAccess: normalizeMenuPaths(data.menuAccess),
@@ -169,6 +171,7 @@ function getSecondaryAuth() {
 
 export default function UsersPage() {
   const [nama, setNama] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>(["sekretariat"]);
@@ -382,8 +385,14 @@ export default function UsersPage() {
   const handleCreateUser = async (event: React.FormEvent): Promise<boolean> => {
     event.preventDefault();
 
-    if (!nama.trim() || !email.trim() || password.length < 6 || selectedRoles.length === 0) {
-      showToast("Nama, email, password minimal 6 karakter, dan minimal satu role wajib diisi.", "error");
+    if (!nama.trim() || !username.trim() || !email.trim() || password.length < 6 || selectedRoles.length === 0) {
+      showToast("Nama, username, email, password minimal 6 karakter, dan minimal satu role wajib diisi.", "error");
+      return false;
+    }
+
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,40}$/.test(normalizedUsername)) {
+      showToast("Username harus 3-40 karakter: huruf kecil, angka, titik, garis bawah, atau tanda hubung.", "error");
       return false;
     }
 
@@ -396,11 +405,18 @@ export default function UsersPage() {
     const secondaryAuth = getSecondaryAuth();
 
     try {
+      const existingUsername = await getDocs(query(collection(db, "users"), where("username", "==", normalizedUsername), limit(1)));
+      if (!existingUsername.empty) {
+        showToast("Username sudah digunakan. Pilih username lain.", "error");
+        return false;
+      }
+
       const credential = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
       const menuAccess = selectedMenuPaths.length > 0 ? selectedMenuPaths : selectedRoles.flatMap((role) => DEFAULT_ROLE_MENU_ACCESS[role] ?? []);
 
       await setDoc(doc(db, "users", credential.user.uid), {
         nama: nama.trim(),
+        username: normalizedUsername,
         email: email.trim(),
         roles: selectedRoles,
         role: selectedRoles[0],
@@ -412,6 +428,7 @@ export default function UsersPage() {
 
       showToast(`User berhasil dibuat dengan role: ${selectedRoleLabels}.`, "success");
       setNama("");
+      setUsername("");
       setEmail("");
       setPassword("");
       setSelectedRoles(["sekretariat"]);
@@ -536,6 +553,7 @@ export default function UsersPage() {
             <thead>
               <tr>
                 <th>Nama</th>
+                <th>Username</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -572,6 +590,7 @@ export default function UsersPage() {
                         <p className="mt-1 text-xs text-slate-500">UID: {user.id}</p>
                       </div>
                     </td>
+                    <td className="font-medium text-emerald-800">{user.username}</td>
                     <td>{user.email}</td>
                     <td>
                       {editingUserId === user.id ? (
@@ -670,7 +689,7 @@ export default function UsersPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className={`${styles.helperText} py-10 text-center text-sm text-slate-600`}>
+                  <td colSpan={6} className={`${styles.helperText} py-10 text-center text-sm text-slate-600`}>
                     Belum ada user CMS.
                   </td>
                 </tr>
@@ -730,6 +749,13 @@ export default function UsersPage() {
                 />
                 <input
                   className={`${styles.input} px-3 py-2 rounded-md`}
+                  placeholder="Username login"
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                />
+                <input
+                  className={`${styles.input} px-3 py-2 rounded-md md:col-span-2`}
                   type="email"
                   placeholder="Email login"
                   value={email}
