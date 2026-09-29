@@ -368,32 +368,8 @@ export default function UsersPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/delete-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: userId, email: target.email }),
-      });
-
-      const result = await response.json();
-      const authDeleteFailed = !response.ok || !result.success;
-
-      if (authDeleteFailed) {
-        console.warn("Gagal menghapus akun auth via API:", result);
-      }
-
-      try {
-        await deleteDoc(doc(db, "users", userId));
-        showToast(
-          authDeleteFailed
-            ? "Dokumen user di CMS berhasil dihapus. Hapus akun Auth perlu dicek kembali di sisi server."
-            : "User berhasil dihapus dari daftar CMS dan akses login ditutup.",
-          authDeleteFailed ? "info" : "success",
-        );
-      } catch (error) {
-        console.error("Gagal menghapus user dari Firestore setelah Auth dihapus:", error);
-        showToast("Akun Auth berhasil dihapus, tetapi penghapusan dokumen user di Firestore gagal. Cek console browser untuk detail.", "error");
-      }
-
+      await deleteDoc(doc(db, "users", userId));
+      showToast("User berhasil dihapus dari daftar CMS.", "success");
       await loadUsers();
     } catch (error) {
       console.error("Gagal menghapus user:", error);

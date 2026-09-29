@@ -20,8 +20,8 @@ export default function HomeClient() {
       try {
         const [postSnapshot, scheduleSnapshot, menuSnapshot] = await Promise.all([
           getDocs(query(collection(db, "posts"), where("status", "==", "published"))),
-          getDocs(query(collection(db, "jadwal"), where("isPublic", "==", true))),
-          getDocs(collection(db, "publicMenus")),
+          getDocs(query(collection(db, "jadwal_ibadah"), where("isPublic", "==", true))),
+          getDocs(query(collection(db, "publicMenus"), where("status", "==", "published"))),
         ]);
 
         setPosts(postSnapshot.docs.map((document) => ({ id: document.id, ...document.data() })) as ChurchPost[]);

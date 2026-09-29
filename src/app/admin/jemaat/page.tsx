@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
+import { QRCodeCanvas } from "qrcode.react";
 import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
 import { Search, Plus, Eye, Edit2, Trash2 } from "lucide-react";
 
@@ -19,8 +20,10 @@ type Jemaat = {
   kecamatan?: string;
   nomorHp?: string;
   email?: string;
+  umur?: number;
   kategoriUsia?: string;
   pinPoint?: string;
+  status?: string;
 };
 
 const initialForm = {
@@ -37,6 +40,7 @@ const initialForm = {
   kecamatan: "",
   nomorHp: "",
   email: "",
+  umur: 0,
   kategoriUsia: "",
   pinPoint: "",
 };
@@ -52,16 +56,35 @@ export default function JemaatPage() {
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailItem, setDetailItem] = useState<Jemaat | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrItem, setQrItem] = useState<Jemaat | null>(null);
   const [nikError, setNikError] = useState("");
   const [duplicateNikOwner, setDuplicateNikOwner] = useState<Jemaat | null>(null);
 
+  const normalizeDateString = (value: unknown) => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    if (typeof value === "object" && value !== null && "toDate" in value && typeof (value as any).toDate === "function") {
+      return (value as any).toDate().toISOString().slice(0, 10);
+    }
+    return "";
+  };
+
   const fetchData = async () => {
     try {
-      const querySnapshot = await getDocs(query(collection(db, "jemaat"), orderBy("nama", "asc")));
-      const data = querySnapshot.docs.map((document) => ({
-        id: document.id,
-        ...document.data(),
-      })) as Jemaat[];
+      const querySnapshot = await getDocs(query(collection(db, "data_induk"), orderBy("nama", "asc")));
+      const data = querySnapshot.docs.map((document) => {
+        const raw = document.data();
+        return {
+          id: document.id,
+          ...raw,
+          tanggalLahir: normalizeDateString(raw.tanggalLahir),
+          tanggalBaptis: normalizeDateString(raw.tanggalBaptis),
+          umur: typeof raw.umur === "number" ? raw.umur : raw.umur ? Number(raw.umur) : undefined,
+          kategoriUsia: typeof raw.kategoriUsia === "string" ? raw.kategoriUsia : "",
+        } as Jemaat;
+      });
       setJemaat(data);
     } catch (error) {
       console.error("Gagal mengambil data:", error);
@@ -106,6 +129,36 @@ export default function JemaatPage() {
     }
   }, [editingId, form.nik, jemaat]);
 
+  useEffect(() => {
+    if (!form.tanggalLahir) {
+      setForm((current) => ({ ...current, umur: 0, kategoriUsia: "" }));
+      return;
+    }
+
+    const birthDate = new Date(form.tanggalLahir);
+    if (Number.isNaN(birthDate.getTime())) {
+      setForm((current) => ({ ...current, umur: 0, kategoriUsia: "" }));
+      return;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age -= 1;
+    }
+
+    const category =
+      age >= 60 ? "Lansia" :
+      age >= 31 ? "Dewasa" :
+      age >= 18 ? "Pemuda" :
+      age >= 13 ? "Remaja" :
+      age >= 6 ? "Anak-anak" :
+      age >= 0 ? "Balita" : "";
+
+    setForm((current) => ({ ...current, umur: age, kategoriUsia: category }));
+  }, [form.tanggalLahir]);
+
   const resetForm = () => {
     setForm({ ...initialForm });
     setEditingId(null);
@@ -137,6 +190,7 @@ export default function JemaatPage() {
       kecamatan: item.kecamatan ?? "",
       nomorHp: item.nomorHp ?? "",
       email: item.email ?? "",
+      umur: item.umur ?? 0,
       kategoriUsia: item.kategoriUsia ?? "",
       pinPoint: item.pinPoint ?? "",
     });
@@ -164,12 +218,10 @@ export default function JemaatPage() {
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         nik: form.nik.trim(),
         nkk: form.nkk.trim(),
         nama: form.nama.trim(),
-        tanggalLahir: form.tanggalLahir.trim(),
-        tanggalBaptis: form.tanggalBaptis.trim(),
         jenisKelamin: form.jenisKelamin.trim(),
         statusPerkawinan: form.statusPerkawinan.trim(),
         alamat: form.alamat.trim(),
@@ -182,11 +234,25 @@ export default function JemaatPage() {
         pinPoint: form.pinPoint.trim(),
       };
 
+      if (form.tanggalLahir) {
+        payload.tanggalLahir = new Date(form.tanggalLahir);
+      }
+      if (form.tanggalBaptis) {
+        payload.tanggalBaptis = new Date(form.tanggalBaptis);
+      }
+      if (typeof form.umur === "number") {
+        payload.umur = form.umur;
+      }
+
       if (editingId) {
-        await updateDoc(doc(db, "jemaat", editingId), payload);
+        await updateDoc(doc(db, "data_induk", editingId), payload);
         alert("Data jemaat berhasil diperbarui.");
       } else {
-        await addDoc(collection(db, "jemaat"), payload);
+        await addDoc(collection(db, "data_induk"), {
+          ...payload,
+          status: "Aktif",
+          status_keanggotaan: "Aktif",
+        });
         alert("Data jemaat berhasil ditambahkan.");
       }
 
@@ -207,12 +273,20 @@ export default function JemaatPage() {
     }
 
     try {
-      await deleteDoc(doc(db, "jemaat", itemId));
+      await deleteDoc(doc(db, "data_induk", itemId));
       await fetchData();
     } catch (error) {
       console.error("Gagal menghapus data jemaat:", error);
       alert("Gagal menghapus data jemaat.");
     }
+  };
+
+  const getStatusBadgeClass = (status?: string) => {
+    if (!status) return "bg-slate-100 text-slate-700";
+    const normalized = status.toLowerCase();
+    if (normalized === "aktif") return "bg-green-100 text-green-800";
+    if (normalized === "meninggal") return "bg-rose-100 text-rose-800";
+    return "bg-amber-100 text-amber-800";
   };
 
   const sortJemaat = (items: Jemaat[]) => [...items].sort((first, second) => (first.nama ?? "").localeCompare(second.nama ?? ""));
@@ -274,10 +348,12 @@ export default function JemaatPage() {
       </section>
 
       <section className="overflow-visible rounded-[1.75rem] border border-slate-200 bg-slate-50 shadow-sm">
-        <div className="hidden items-center grid-cols-[4rem_2.5fr_5fr_auto] gap-4 border-b border-slate-200 px-6 py-4 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 sm:grid">
+        <div className="hidden items-center grid-cols-[4rem_2fr_3fr_1.5fr_1fr_auto] gap-4 border-b border-slate-200 px-6 py-4 text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 sm:grid">
           <span />
           <span>Nama</span>
           <span>Alamat</span>
+          <span>Kategori Usia</span>
+          <span>Status</span>
           <span className="text-right">Aksi</span>
         </div>
 
@@ -286,7 +362,7 @@ export default function JemaatPage() {
             visibleJemaat.map((item) => (
               <article
                 key={item.id}
-                className="group relative overflow-visible rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg sm:grid sm:grid-cols-[4rem_2.5fr_5fr_auto] sm:items-center sm:gap-3"
+                className="group relative overflow-visible rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg sm:grid sm:grid-cols-[4rem_2fr_3fr_1.5fr_1fr_auto] sm:items-center sm:gap-3"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-3xl bg-emerald-950 text-white shadow-sm shadow-emerald-950/10">
                   <span className="text-base font-semibold">{item.nama ? item.nama.charAt(0).toUpperCase() : "?"}</span>
@@ -300,6 +376,16 @@ export default function JemaatPage() {
                   <p className="text-sm font-semibold text-slate-900">{item.alamat ?? "-"}</p>
                 </div>
 
+                <div className="mt-3 sm:mt-0">
+                  <p className="text-sm text-slate-700">{item.kategoriUsia ?? "-"}</p>
+                </div>
+
+                <div className="mt-3 sm:mt-0">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(item.status)}`}>
+                    {item.status ?? "Tidak Diketahui"}
+                  </span>
+                </div>
+
                 <div className="mt-4 flex justify-end gap-3 sm:mt-0">
                   <button
                     type="button"
@@ -308,6 +394,22 @@ export default function JemaatPage() {
                     aria-label={`Detail ${item.nama ?? "jemaat"}`}
                   >
                     <Eye className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="text-slate-500 transition hover:text-sky-600"
+                    onClick={() => {
+                      setQrItem(item);
+                      setShowQRModal(true);
+                    }}
+                    aria-label={`Lihat QR ${item.nama ?? "jemaat"}`}
+                  >
+                    {/* QR icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <rect x="3" y="3" width="7" height="7" strokeWidth="2" />
+                      <rect x="14" y="3" width="7" height="7" strokeWidth="2" />
+                      <rect x="14" y="14" width="7" height="7" strokeWidth="2" />
+                    </svg>
                   </button>
                   <button
                     type="button"
@@ -439,15 +541,26 @@ export default function JemaatPage() {
                   <input className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:bg-white" type="email" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Umur</label>
+                  <input
+                    type="number"
+                    readOnly
+                    disabled
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 shadow-sm"
+                    value={form.umur}
+                    placeholder="Umur otomatis"
+                  />
+                </div>
+                <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Kategori Usia</label>
-                  <select className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm transition focus:border-slate-300 focus:bg-white" value={form.kategoriUsia} onChange={(event) => setForm({ ...form, kategoriUsia: event.target.value })}>
-                    <option value="">Kategori Usia</option>
-                    <option value="Balita">Balita</option>
-                    <option value="Remaja">Remaja</option>
-                    <option value="Pemuda">Pemuda</option>
-                    <option value="Dewasa">Dewasa</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 shadow-sm"
+                    value={form.kategoriUsia}
+                    placeholder="Kategori otomatis"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Pin Point</label>
@@ -461,6 +574,54 @@ export default function JemaatPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showQRModal && qrItem && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onClick={() => setShowQRModal(false)}>
+          <div className="mx-auto w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">QR Card</h3>
+                <p className="text-sm text-slate-500">Simpan atau cetak QR untuk kartu jemaat.</p>
+              </div>
+              <button className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm" onClick={() => setShowQRModal(false)}>Tutup</button>
+            </div>
+
+            <div className="mt-4 flex flex-col items-center gap-3">
+              <div id={`qr-card-${qrItem.id}`} className="rounded-xl bg-white p-4">
+                <QRCodeCanvas id={`qrcanvas-${qrItem.id}`} value={qrItem.id} size={220} includeMargin={true} />
+                <div className="mt-3 text-center">
+                  <div className="text-sm font-semibold text-slate-900">{qrItem.nama}</div>
+                  <div className="text-xs text-slate-500">NIK: {qrItem.nik ?? "-"}</div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => {
+                    const canvas = document.getElementById(`qrcanvas-${qrItem.id}`) as HTMLCanvasElement | null;
+                    if (!canvas) return alert("QR canvas tidak ditemukan.");
+                    const url = canvas.toDataURL("image/png");
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `QR_${(qrItem.nama ?? qrItem.id).replace(/\s+/g, "_")}.png`;
+                    a.click();
+                  }}
+                >
+                  Download PNG
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold"
+                  onClick={() => window.print()}
+                >
+                  Cetak
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -484,6 +645,8 @@ export default function JemaatPage() {
                 ["NIK", detailItem.nik],
                 ["NKK / No KK", detailItem.nkk],
                 ["Tanggal Lahir", detailItem.tanggalLahir],
+                ["Umur", detailItem.umur?.toString()],
+                ["Kategori Usia", detailItem.kategoriUsia],
                 ["Tanggal Baptis", detailItem.tanggalBaptis],
                 ["Jenis Kelamin", detailItem.jenisKelamin],
                 ["Status Perkawinan", detailItem.statusPerkawinan],
@@ -493,7 +656,6 @@ export default function JemaatPage() {
                 ["Kecamatan", detailItem.kecamatan],
                 ["Nomor HP", detailItem.nomorHp],
                 ["Email", detailItem.email],
-                ["Kategori Usia", detailItem.kategoriUsia],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{label}</p>

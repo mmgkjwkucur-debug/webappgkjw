@@ -47,11 +47,26 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+
+      const sessionResponse = await fetch("/api/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!sessionResponse.ok) {
+        const body = await sessionResponse.json().catch(() => ({}));
+        throw new Error(body?.error || "Gagal membuat sesi login.");
+      }
+
       router.push("/admin");
     } catch (error) {
       console.error("Login failed", error);
-      setError(getAuthErrorMessage(error));
+      setError(error instanceof Error ? error.message : getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }

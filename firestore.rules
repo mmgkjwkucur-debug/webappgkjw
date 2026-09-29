@@ -13,20 +13,20 @@ service cloud.firestore {
         : null;
     }
 
+    function listHasRole(targetRole, roles) {
+      return roles is list
+        && roles.size() > 0
+        && targetRole in roles;
+    }
+
     function userHasRole(targetRole) {
       let data = currentUserData();
       return data != null
         && (
           data.role == targetRole
           || data.role == "admin"
-          || (
-            "roles" in data
-            && data.roles is list
-            && (
-              targetRole in data.roles
-              || "admin" in data.roles
-            )
-          )
+          || listHasRole(targetRole, data.roles)
+          || listHasRole("admin", data.roles)
         );
     }
 
@@ -41,10 +41,6 @@ service cloud.firestore {
         || userHasRole("phmj")
         || userHasRole("majelis")
         || userHasRole("multi_media");
-    }
-
-    function isUserManager() {
-      return userHasRole("admin");
     }
 
     function hasValidRoles(data) {
@@ -91,25 +87,20 @@ service cloud.firestore {
         && data.tanggal.size() <= 40;
     }
 
-    function isValidSchedule(data) {
-      return data.keys().hasOnly(["judul", "tanggal", "waktu", "lokasi", "pelayan", "catatan", "isPublic", "authorRole"])
-        && data.keys().hasAll(["judul", "tanggal", "waktu", "lokasi", "isPublic", "authorRole"])
-        && data.judul is string
-        && data.tanggal is string
+    function isValidJadwalIbadah(data) {
+      return data.keys().hasOnly(["tanggal", "waktu", "jenis", "tema", "bacaan", "pelayanFirman", "liturgos", "majelis", "pemusik", "multimedia", "isPublic"])
+        && data.keys().hasAll(["tanggal", "waktu", "jenis", "tema", "bacaan", "pelayanFirman", "liturgos", "majelis", "pemusik", "multimedia"])
+        && (!("isPublic" in data) || data.isPublic is bool)
+        && data.tanggal is timestamp
         && data.waktu is string
-        && data.lokasi is string
-        && data.isPublic is bool
-        && data.authorRole is string
-        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
-        && (!("pelayan" in data) || data.pelayan is string)
-        && (!("catatan" in data) || data.catatan is string)
-        && data.judul.size() >= 3
-        && data.judul.size() <= 120
-        && data.tanggal.size() <= 20
-        && data.waktu.size() <= 20
-        && data.lokasi.size() <= 160
-        && (!("pelayan" in data) || data.pelayan.size() <= 160)
-        && (!("catatan" in data) || data.catatan.size() <= 600);
+        && data.jenis is string
+        && data.tema is string
+        && data.bacaan is string
+        && data.pelayanFirman is string
+        && data.liturgos is string
+        && data.majelis is string
+        && data.pemusik is string
+        && data.multimedia is string;
     }
 
     function isValidRenungan(data) {
@@ -131,24 +122,6 @@ service cloud.firestore {
         && data.updatedAt.size() <= 40;
     }
 
-    function isValidBukuInduk(data) {
-      return data.keys().hasOnly(["nama", "nama_lengkap", "status_keanggotaan", "gereja_asal", "gereja_tujuan", "tanggal_atestasi", "tanggal_meninggal", "nomor_surat_atestasi", "tempat_dimakamkan", "keterangan", "createdAt", "updatedAt"])
-        && data.keys().hasAll(["status_keanggotaan", "createdAt", "updatedAt"])
-        && data.status_keanggotaan is string
-        && data.status_keanggotaan in ["Aktif", "Atestasi Keluar", "Meninggal"]
-        && data.createdAt is string
-        && data.updatedAt is string
-        && (!("nama" in data) || data.nama is string)
-        && (!("nama_lengkap" in data) || data.nama_lengkap is string)
-        && (!("gereja_asal" in data) || data.gereja_asal is string)
-        && (!("gereja_tujuan" in data) || data.gereja_tujuan is string)
-        && (!("tanggal_atestasi" in data) || data.tanggal_atestasi is string)
-        && (!("tanggal_meninggal" in data) || data.tanggal_meninggal is string)
-        && (!("nomor_surat_atestasi" in data) || data.nomor_surat_atestasi is string)
-        && (!("tempat_dimakamkan" in data) || data.tempat_dimakamkan is string)
-        && (!("keterangan" in data) || data.keterangan is string);
-    }
-
     function isValidMutasi(data) {
       return data.keys().hasOnly(["jenis_mutasi", "jemaat_id", "jemaat_nama", "gereja_asal", "gereja_tujuan", "tanggal_atestasi", "tanggal_meninggal", "nomor_surat_atestasi", "tempat_dimakamkan", "keterangan", "createdAt", "updatedAt"])
         && data.keys().hasAll(["jenis_mutasi", "createdAt", "updatedAt"])
@@ -165,6 +138,46 @@ service cloud.firestore {
         && (!("nomor_surat_atestasi" in data) || data.nomor_surat_atestasi is string)
         && (!("tempat_dimakamkan" in data) || data.tempat_dimakamkan is string)
         && (!("keterangan" in data) || data.keterangan is string);
+    }
+
+    function isValidPenerimaanKas(data) {
+      return data.keys().hasOnly(["tanggal", "nominal", "kategori_penerimaan", "jenis_ibadah", "keterangan", "nama_jemaat", "jenis", "doa_keterangan", "nama_donatur", "tujuan", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["tanggal", "nominal", "kategori_penerimaan", "createdAt", "updatedAt"])
+        && data.tanggal is string
+        && data.nominal is number
+        && data.kategori_penerimaan is string
+        && data.kategori_penerimaan in ["Persembahan Ibadah", "Persepuluhan & Syukur", "Sumbangan Khusus"]
+        && data.createdAt is string
+        && data.updatedAt is string
+        && data.tanggal.size() <= 40
+        && data.kategori_penerimaan.size() <= 60
+        && data.createdAt.size() <= 40
+        && data.updatedAt.size() <= 40
+        && (!("jenis_ibadah" in data) || (data.jenis_ibadah is string && data.jenis_ibadah.size() <= 120))
+        && (!("keterangan" in data) || (data.keterangan is string && data.keterangan.size() <= 800))
+        && (!("nama_jemaat" in data) || (data.nama_jemaat is string && data.nama_jemaat.size() <= 120))
+        && (!("jenis" in data) || (data.jenis is string && data.jenis.size() <= 120))
+        && (!("doa_keterangan" in data) || (data.doa_keterangan is string && data.doa_keterangan.size() <= 800))
+        && (!("nama_donatur" in data) || (data.nama_donatur is string && data.nama_donatur.size() <= 120))
+        && (!("tujuan" in data) || (data.tujuan is string && data.tujuan.size() <= 160));
+    }
+
+    function isValidPengeluaranKas(data) {
+      return data.keys().hasOnly(["tanggal", "kategori", "nomorNota", "keterangan", "nominal", "createdAt", "updatedAt"])
+        && data.keys().hasAll(["tanggal", "kategori", "keterangan", "nominal", "createdAt", "updatedAt"])
+        && data.tanggal is string
+        && data.kategori is string
+        && data.kategori in ["Operasional", "Honorarium/Gaji", "Kegiatan & Pelayanan", "Diakonia & Sosial", "Pembangunan & Pemeliharaan", "Lain-lain"]
+        && data.nominal is number
+        && data.createdAt is string
+        && data.updatedAt is string
+        && data.tanggal.size() <= 40
+        && data.kategori.size() <= 60
+        && data.createdAt.size() <= 40
+        && data.updatedAt.size() <= 40
+        && data.keterangan is string
+        && data.keterangan.size() <= 800
+        && (!("nomorNota" in data) || (data.nomorNota is string && data.nomorNota.size() <= 120));
     }
 
     function isValidPublicMenu(data) {
@@ -216,10 +229,10 @@ service cloud.firestore {
       allow delete: if isMultimediaAdmin();
     }
 
-    match /jadwal/{scheduleId} {
+    match /jadwal_ibadah/{scheduleId} {
       allow read: if resource.data.isPublic == true || isStaff();
-      allow create, update: if isMultimediaAdmin() && isValidSchedule(request.resource.data);
-      allow delete: if isMultimediaAdmin();
+      allow create, update: if isStaff() && isValidJadwalIbadah(request.resource.data);
+      allow delete: if isStaff();
     }
 
     match /publicMenus/{menuId} {
@@ -234,20 +247,34 @@ service cloud.firestore {
       allow delete: if isMultimediaAdmin();
     }
 
-    match /buku_induk/{memberId} {
-      allow get, list: if signedIn() && isStaff();
-      allow create, update: if signedIn() && isStaff() && isValidBukuInduk(request.resource.data);
-      allow delete: if signedIn() && userHasRole("admin");
-    }
-
     match /mutasi/{mutasiId} {
       allow get, list: if signedIn() && isStaff();
       allow create, update: if signedIn() && isStaff() && isValidMutasi(request.resource.data);
       allow delete: if signedIn() && userHasRole("admin");
     }
 
-    match /jemaat/{memberId} {
-      allow read, write: if userHasRole("admin") || userHasRole("sekretariat") || userHasRole("phmj") || userHasRole("majelis");
+    match /absensi_ibadah/{entryId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create: if signedIn() && isStaff();
+      allow update, delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /penerimaan_kas/{entryId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create, update: if signedIn() && isStaff() && isValidPenerimaanKas(request.resource.data);
+      allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /pengeluaran_kas/{entryId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create, update: if signedIn() && isStaff() && isValidPengeluaranKas(request.resource.data);
+      allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    match /data_induk/{memberId} {
+      allow get, list: if signedIn() && isStaff();
+      allow create, update: if signedIn() && isStaff();
+      allow delete: if signedIn() && userHasRole("admin");
     }
   }
 }

@@ -7,7 +7,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_ROLE_MENU_ACCESS, getRoleLabel, normalizeMenuPaths, resolveUserRoles, type UserRole } from "@/lib/roles";
-import { Home, Book, Calendar, Users, Settings, Menu, LogOut, FileText, ClipboardList, BookOpen, Sparkles, ChevronDown, ChevronRight, CircleDollarSign, HandCoins, HeartHandshake, Wallet, BadgeDollarSign, type LucideIcon } from "lucide-react";
+import { Home, Book, Calendar, Users, Settings, Menu, LogOut, FileText, ClipboardList, BookOpen, Sparkles, ChevronDown, ChevronRight, CircleDollarSign, HandCoins, HeartHandshake, Wallet, BadgeDollarSign, Camera, type LucideIcon } from "lucide-react";
 
 type SidebarMenuItem = {
   name: string;
@@ -43,26 +43,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       try {
-        const profileDoc = await import("firebase/firestore").then(({ getDoc }) => getDoc(doc(db, "users", user.uid)));
-        if (!profileDoc.exists()) {
-          await setDoc(
-            doc(db, "users", user.uid),
-            {
-              nama: user.email?.split("@")[0] ?? "Admin",
-              email: user.email ?? "",
-              role: "admin",
-              roles: ["admin"],
-              status: "active",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-            { merge: true },
-          );
+        const profileRef = doc(db, "users", user.uid);
+        let profileDoc = await import("firebase/firestore").then(({ getDoc }) => getDoc(profileRef));
+        let profileData = profileDoc.exists() ? profileDoc.data() : null;
+
+        if (!profileData || typeof profileData.role !== "string" || !Array.isArray(profileData.roles) || profileData.roles.length === 0) {
+          const defaultRoleData = {
+            role: "admin",
+            roles: ["admin"],
+            status: "active",
+            updatedAt: new Date().toISOString(),
+          };
+          const defaultProfileData = {
+            nama: profileData?.nama ?? user.email?.split("@")[0] ?? "Admin",
+            email: profileData?.email ?? user.email ?? "",
+            createdAt: profileData?.createdAt ?? new Date().toISOString(),
+            ...defaultRoleData,
+          };
+
+          await setDoc(profileRef, defaultProfileData, {
+            merge: true,
+          });
+
+          profileDoc = await import("firebase/firestore").then(({ getDoc }) => getDoc(profileRef));
+          profileData = profileDoc.exists() ? profileDoc.data() : defaultProfileData;
         }
 
         const roles = await resolveUserRoles(db, user);
-        const profileName = profileDoc.exists() ? (profileDoc.data().nama as string | undefined) : undefined;
-        const menuAccess = normalizeMenuPaths(profileDoc.exists() ? profileDoc.data().menuAccess : []);
+        const profileName = profileData?.nama as string | undefined;
+        const menuAccess = normalizeMenuPaths(profileData?.menuAccess);
         const resolvedRoles = (roles.length > 0 ? roles : ["admin"]) as UserRole[];
         const effectiveMenuAccess = menuAccess.length > 0 ? menuAccess : resolvedRoles.flatMap((role) => DEFAULT_ROLE_MENU_ACCESS[role as keyof typeof DEFAULT_ROLE_MENU_ACCESS] ?? []);
         setUserRoles(resolvedRoles);
@@ -82,8 +91,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Gagal membersihkan sesi login:", error);
+    } finally {
+      await signOut(auth);
+      router.push("/login");
+    }
   };
 
   const [expandedMenu, setExpandedMenu] = useState<string | null>(
@@ -102,6 +117,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Dashboard", path: "/admin", icon: Home, roles: ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"] },
     { name: "Kelola Artikel & Web", path: "/admin/posts", icon: Book, roles: ["admin", "multi_media"] },
     { name: "Jadwal Ibadah", path: "/admin/jadwal", icon: Calendar, roles: ["admin", "multi_media"] },
+    { name: "Scanner Presensi", path: "/jadwal/scanner", icon: Camera, roles: ["admin", "sekretariat", "multi_media"] },
     {
       name: "Buku Induk Jemaat",
       path: "/admin/buku-induk-jemaat",
@@ -111,29 +127,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: "Daftar Kartu Keluarga (KK)", path: "/admin/buku-induk-jemaat/daftar-kartu-keluarga", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
         { name: "Daftar Anggota Jemaat", path: "/admin/jemaat", icon: Users, roles: ["admin", "sekretariat", "phmj", "majelis"] },
         { name: "Mutasi Jemaat", path: "/admin/buku-induk-jemaat/mutasi-jemaat", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
+        { name: "Atestasi Masuk", path: "/admin/buku-induk-jemaat/mutasi-jemaat/atestasi-masuk", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
+        { name: "Atestasi Keluar", path: "/admin/buku-induk-jemaat/mutasi-jemaat/atestasi-keluar", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
+        { name: "Meninggal", path: "/admin/buku-induk-jemaat/mutasi-jemaat/meninggal", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
       ],
     },
+    { name: "EWS Keaktifan Jemaat", path: "/admin/ews", icon: BookOpen, roles: ["admin", "sekretariat", "phmj", "majelis"] },
     {
       name: "Penerimaan Kas",
       path: "/admin/penerimaan-kas",
       icon: CircleDollarSign,
       roles: ["admin", "bendahara", "multi_media"],
-      children: [
-        { name: "Persembahan Ibadah", path: "/admin/penerimaan-kas/persembahan-ibadah", icon: HandCoins, roles: ["admin", "bendahara", "multi_media"] },
-        { name: "Persepuluhan & Syukur", path: "/admin/penerimaan-kas/persembahan-persepuluhan-syukur", icon: Wallet, roles: ["admin", "bendahara", "multi_media"] },
-        { name: "Sumbangan / Donatur Khusus", path: "/admin/penerimaan-kas/sumbangan-donatur-khusus", icon: HeartHandshake, roles: ["admin", "bendahara", "multi_media"] },
-      ],
+      // consolidated into single page; no children
     },
     {
       name: "Pengeluaran Kas",
       path: "/admin/pengeluaran-kas",
       icon: BadgeDollarSign,
       roles: ["admin", "bendahara", "multi_media"],
-      children: [
-        { name: "Biaya Operasional", path: "/admin/pengeluaran-kas/biaya-operasional", icon: Wallet, roles: ["admin", "bendahara", "multi_media"] },
-        { name: "Dana Program Kerja / Komisi", path: "/admin/pengeluaran-kas/dana-program-kerja-komisi", icon: HandCoins, roles: ["admin", "bendahara", "multi_media"] },
-        { name: "Dana Diakonia & Bantuan", path: "/admin/pengeluaran-kas/dana-diakonia-bantuan", icon: HeartHandshake, roles: ["admin", "bendahara", "multi_media"] },
-      ],
+      // consolidated into single page; no children
+    },
+    {
+      name: "Buku Kas Umum",
+      path: "/admin/buku-kas-umum",
+      icon: HandCoins,
+      roles: ["admin", "bendahara", "multi_media"],
     },
     {
       name: "Sekretariat & Surat",
@@ -200,58 +218,51 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 const activeCls = "bg-white/10 text-white border-l-4 border-amber-300 pl-4";
                 const itemIconProps = { size: 16, className: isActive ? "text-amber-300" : "text-emerald-200/55" };
 
-                if (item.children && item.children.length > 0) {
-                  return (
-                    <div key={item.name} className="space-y-1">
-                      <button
-                        type="button"
-                        className={`${base} w-full justify-between rounded-2xl ${isActive ? activeCls : inactive}`}
-                        onClick={() => setExpandedMenu((current) => (current === item.name ? null : item.name))}
-                      >
-                        <span className="flex items-center gap-3">
-                          <item.icon {...itemIconProps} />
-                          <span>{item.name}</span>
-                        </span>
-                        {menuOpen ? <ChevronDown size={16} className="text-emerald-200" /> : <ChevronRight size={16} className="text-emerald-200" />}
-                      </button>
-                      {menuOpen && (
-                        <div className="space-y-1 px-2">
-                          {item.children
-                            .filter((child) => child.roles.some((role) => userRoles.includes(role as UserRole)) && canAccessMenu(child.path))
-                            .map((child) => {
-                              const isChildActive = pathname === child.path;
-                              return (
-                                <Link
-                                  key={child.path}
-                                  href={child.path}
-                                  className={`flex items-center gap-3 rounded-2xl px-4 py-2 text-sm transition ${
-                                    isChildActive
-                                      ? "bg-emerald-50 text-emerald-950"
-                                      : "text-emerald-100/80 hover:bg-emerald-50 hover:text-emerald-950"
-                                  }`}
-                                  onClick={() => setMobileNavOpen(false)}
-                                >
-                                  <child.icon size={14} className={isChildActive ? "text-emerald-700" : "text-emerald-200"} />
-                                  <span>{child.name}</span>
-                                </Link>
-                              );
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
                 return (
-                  <Link
-                    key={item.name}
-                    href={item.path ?? "/"}
-                    className={`${base} ${isActive ? activeCls : inactive}`}
-                    onClick={() => setMobileNavOpen(false)}
-                  >
-                    <item.icon {...itemIconProps} />
-                    <span className="truncate">{item.name}</span>
-                  </Link>
+                  <div key={item.name}>
+                    <div className="flex items-center gap-3 rounded-2xl border border-transparent transition-all duration-200 hover:border-slate-700/20">
+                      <Link
+                        href={item.path ?? "/"}
+                        className={`${base} ${isActive ? activeCls : inactive} flex-1`}
+                        onClick={() => setMobileNavOpen(false)}
+                      >
+                        <item.icon {...itemIconProps} />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+
+                      {item.children ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-emerald-100 transition hover:bg-white/15"
+                          onClick={() => setExpandedMenu((current) => (current === item.name ? null : item.name))}
+                          aria-label={`${menuOpen ? "Tutup" : "Buka"} submenu ${item.name}`}
+                        >
+                          {menuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {item.children && menuOpen ? (
+                      <div className="mt-2 space-y-2 pl-8">
+                        {item.children
+                          .filter((child) => canAccessMenu(child.path))
+                          .map((child) => {
+                            const isChildActive = pathname === child.path;
+                            return (
+                              <Link
+                                key={child.name}
+                                href={child.path}
+                                className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-all duration-200 ${isChildActive ? "bg-white/10 text-white" : "text-emerald-100/70 hover:bg-white/10 hover:text-white"}`}
+                                onClick={() => setMobileNavOpen(false)}
+                              >
+                                <child.icon size={14} className={isChildActive ? "text-amber-300" : "text-emerald-200/55"} />
+                                <span className="truncate">{child.name}</span>
+                              </Link>
+                            );
+                          })}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
           </nav>

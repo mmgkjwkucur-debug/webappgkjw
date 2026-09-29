@@ -20,10 +20,11 @@ import { adminUi as styles } from "../../ui";
 type MutationType = "atestasi_masuk" | "atestasi_keluar" | "meninggal";
 type TabKey = MutationType;
 
-type BukuIndukRecord = {
+type JemaatRecord = {
   id: string;
   nama_lengkap?: string;
   nama?: string;
+  status?: string;
   status_keanggotaan?: string;
   gereja_asal?: string;
   gereja_tujuan?: string;
@@ -106,7 +107,7 @@ export default function MutasiJemaatPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<MutationRecord | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [members, setMembers] = useState<BukuIndukRecord[]>([]);
+  const [members, setMembers] = useState<JemaatRecord[]>([]);
   const [mutations, setMutations] = useState<MutationRecord[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [memberSearch, setMemberSearch] = useState("");
@@ -114,7 +115,7 @@ export default function MutasiJemaatPage() {
   const filteredMembers = useMemo(() => {
     const term = memberSearch.trim().toLowerCase();
     return members.filter((member) => {
-      const status = (member.status_keanggotaan ?? "Aktif").toLowerCase();
+      const status = (member.status ?? member.status_keanggotaan ?? "Aktif").toLowerCase();
       const label = (member.nama_lengkap ?? member.nama ?? "").toLowerCase();
       const matchStatus = status === "aktif" || status === "active" || status === "";
       const matchSearch = !term || label.includes(term);
@@ -136,41 +137,23 @@ export default function MutasiJemaatPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const jemaatQuery = query(collection(db, "jemaat"), orderBy("nama", "asc"));
-      const bukuIndukQuery = query(collection(db, "buku_induk"), orderBy("createdAt", "desc"));
+      const dataIndukQuery = query(collection(db, "data_induk"), orderBy("nama", "asc"));
       const mutasiQuery = query(collection(db, "mutasi"), orderBy("createdAt", "desc"));
 
-      const [jemaatSnapshot, bukuSnapshot, mutasiSnapshot] = await Promise.all([
-        getDocs(jemaatQuery),
-        getDocs(bukuIndukQuery),
+      const [dataIndukSnapshot, mutasiSnapshot] = await Promise.all([
+        getDocs(dataIndukQuery),
         getDocs(mutasiQuery),
       ]);
 
-      const memberMap = new Map<string, BukuIndukRecord>();
-
-      for (const docSnap of jemaatSnapshot.docs) {
+      const localMembers = dataIndukSnapshot.docs.map((docSnap) => {
         const data = docSnap.data() as Record<string, unknown>;
-        memberMap.set(docSnap.id, {
+        return {
           id: docSnap.id,
           ...data,
           nama_lengkap: typeof data.nama_lengkap === "string" ? data.nama_lengkap : typeof data.nama === "string" ? data.nama : "-",
-          status_keanggotaan: typeof data.status_keanggotaan === "string" ? data.status_keanggotaan : "Aktif",
-        });
-      }
-
-      for (const docSnap of bukuSnapshot.docs) {
-        const data = docSnap.data() as Record<string, unknown>;
-        const previous = memberMap.get(docSnap.id);
-        memberMap.set(docSnap.id, {
-          id: docSnap.id,
-          ...(previous ?? {}),
-          ...data,
-          nama_lengkap: typeof data.nama_lengkap === "string" ? data.nama_lengkap : typeof data.nama === "string" ? data.nama : previous?.nama_lengkap ?? "-",
-          status_keanggotaan: typeof data.status_keanggotaan === "string" ? data.status_keanggotaan : previous?.status_keanggotaan ?? "Aktif",
-        });
-      }
-
-      const localMembers = Array.from(memberMap.values()) as BukuIndukRecord[];
+          status: typeof data.status === "string" ? data.status : typeof data.status_keanggotaan === "string" ? data.status_keanggotaan : "Aktif",
+        };
+      }) as JemaatRecord[];
 
       const localMutations = mutasiSnapshot.docs.map((docSnap) => ({
         id: docSnap.id,
@@ -213,51 +196,26 @@ export default function MutasiJemaatPage() {
     return member?.nama_lengkap ?? member?.nama ?? "-";
   };
 
-  const allowedBukuIndukKeys = [
-    "nama",
-    "nama_lengkap",
-    "status_keanggotaan",
-    "gereja_asal",
-    "gereja_tujuan",
-    "tanggal_atestasi",
-    "tanggal_meninggal",
-    "nomor_surat_atestasi",
-    "tempat_dimakamkan",
-    "keterangan",
-    "createdAt",
-    "updatedAt",
-  ] as const;
-
-  const normalizeBukuIndukData = (data: Record<string, unknown>): Record<string, string> => {
-    return allowedBukuIndukKeys.reduce((result, key) => {
-      const value = data[key];
-      if (typeof value === "string") {
-        result[key] = value;
-      }
-      return result;
-    }, {} as Record<string, string>);
-  };
-
-  const ensureBukuIndukDoc = async (memberId: string, status: string, payload: Record<string, unknown>) => {
-    const targetRef = doc(db, "buku_induk", memberId);
-    const targetSnapshot = await getDoc(targetRef);
+  const syncJemaatStatus = async (memberId: string, status: string) => {
+    const dataIndukRef = doc(db, "data_induk", memberId);
+    const dataIndukSnapshot = await getDoc(dataIndukRef);
     const now = new Date().toISOString();
 
-    const existingData = targetSnapshot.exists()
-      ? normalizeBukuIndukData(targetSnapshot.data() as Record<string, unknown>)
-      : {};
+    if (dataIndukSnapshot.exists()) {
+      await updateDoc(dataIndukRef, {
+        status,
+        updatedAt: now,
+      });
+      return true;
+    }
 
-    const updatedPayload = {
-      ...existingData,
-      ...payload,
-      nama_lengkap: existingData.nama_lengkap ?? existingData.nama ?? getMemberName(memberId),
-      status_keanggotaan: status,
-      createdAt: existingData.createdAt ?? now,
+    await setDoc(dataIndukRef, {
+      nama: getMemberName(memberId),
+      status,
+      createdAt: now,
       updatedAt: now,
-    } as Record<string, unknown>;
-
-    await setDoc(targetRef, updatedPayload);
-    return { ref: targetRef, data: updatedPayload };
+    });
+    return true;
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -280,9 +238,11 @@ export default function MutasiJemaatPage() {
           return;
         }
 
-        const bukuIndukRef = await addDoc(collection(db, "buku_induk"), {
+        const jemaatRef = await addDoc(collection(db, "data_induk"), {
           ...basePayload,
           nama_lengkap: form.namaLengkap.trim(),
+          nama: form.namaLengkap.trim(),
+          status: "Aktif",
           status_keanggotaan: "Aktif",
           gereja_asal: form.gerejaAsal.trim(),
           tanggal_atestasi: form.tanggalAtestasi,
@@ -293,7 +253,7 @@ export default function MutasiJemaatPage() {
         await addDoc(collection(db, "mutasi"), {
           ...basePayload,
           jenis_mutasi: "atestasi_masuk",
-          jemaat_id: bukuIndukRef.id,
+          jemaat_id: jemaatRef.id,
           jemaat_nama: form.namaLengkap.trim(),
           gereja_asal: form.gerejaAsal.trim(),
           tanggal_atestasi: form.tanggalAtestasi,
@@ -310,10 +270,15 @@ export default function MutasiJemaatPage() {
         }
 
         const currentMemberName = getMemberName(form.jemaatId);
-        await ensureBukuIndukDoc(form.jemaatId, "Atestasi Keluar", {
+        await syncJemaatStatus(form.jemaatId, "Pindah");
+
+        await updateDoc(doc(db, "jemaat", form.jemaatId), {
+          status: "Pindah",
+          status_keanggotaan: "Atestasi Keluar",
           gereja_tujuan: form.gerejaTujuan.trim(),
           tanggal_atestasi: form.tanggalAtestasi,
           keterangan: form.keterangan.trim(),
+          updatedAt: new Date().toISOString(),
         });
 
         await addDoc(collection(db, "mutasi"), {
@@ -335,10 +300,14 @@ export default function MutasiJemaatPage() {
         }
 
         const currentMemberName = getMemberName(form.jemaatId);
-        await ensureBukuIndukDoc(form.jemaatId, "Meninggal", {
+        await syncJemaatStatus(form.jemaatId, "Meninggal");
+        await updateDoc(doc(db, "jemaat", form.jemaatId), {
+          status: "Meninggal",
+          status_keanggotaan: "Meninggal",
           tanggal_meninggal: form.tanggalMeninggal,
           tempat_dimakamkan: form.tempatDimakamkan.trim(),
           keterangan: form.keterangan.trim(),
+          updatedAt: new Date().toISOString(),
         });
 
         await addDoc(collection(db, "mutasi"), {
