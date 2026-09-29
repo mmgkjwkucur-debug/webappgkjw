@@ -4,6 +4,7 @@ import { AuthErrorCodes, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { db } from "@/lib/firebase";
 import { resolveUserRoles } from "@/lib/roles";
+import LoadingScreen from "@/components/LoadingScreen";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -86,10 +87,13 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Login failed", error);
       setError(error instanceof Error ? error.message : getAuthErrorMessage(error));
-    } finally {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <LoadingScreen label="Menyiapkan ruang GKJW" />;
+  }
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#f7f5ef] px-5 py-10 text-slate-900">
@@ -149,7 +153,7 @@ export default function LoginPage() {
             disabled={loading}
             className="min-h-12 rounded-2xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
-            {loading ? "Memproses..." : "Masuk"}
+            Masuk
           </button>
         </form>
         </div>

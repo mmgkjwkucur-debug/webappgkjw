@@ -21,14 +21,51 @@ export default function ApkUpdateNotice() {
     if (!Capacitor.isNativePlatform()) return;
 
     let active = true;
-    Promise.all([
-      App.getInfo(),
-      fetch(`/apk-update.json?t=${Date.now()}`, { cache: "no-store" }).then((response) => response.json() as Promise<UpdateManifest>),
-    ]).then(([appInfo, manifest]) => {
-      if (active && manifest.versionCode > Number(appInfo.build)) setUpdate(manifest);
-    }).catch((error) => console.warn("Pengecekan update APK gagal:", error));
+    let checking = false;
+    let resumeListener: Awaited<ReturnType<typeof App.addListener>> | undefined;
 
-    return () => { active = false; };
+    const checkForUpdate = async () => {
+      if (checking) return;
+      checking = true;
+
+      try {
+        const [appInfo, response] = await Promise.all([
+          App.getInfo(),
+          fetch(`/apk-update.json?t=${Date.now()}`, { cache: "no-store" }),
+        ]);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const manifest = await response.json() as UpdateManifest;
+        const versionCode = Number(manifest.versionCode);
+        const installedVersionCode = Number(appInfo.build);
+        const apkUrl = new URL(manifest.apkUrl);
+
+        if (
+          active
+          && Number.isInteger(versionCode)
+          && versionCode > installedVersionCode
+          && typeof manifest.versionName === "string"
+          && apkUrl.protocol === "https:"
+        ) {
+          setUpdate({ ...manifest, apkUrl: apkUrl.toString() });
+        }
+      } catch (error) {
+        console.warn("Pengecekan update APK gagal:", error);
+      } finally {
+        checking = false;
+      }
+    };
+
+    void checkForUpdate();
+    void App.addListener("resume", checkForUpdate).then((listener) => {
+      if (active) resumeListener = listener;
+      else void listener.remove();
+    });
+
+    return () => {
+      active = false;
+      void resumeListener?.remove();
+    };
   }, []);
 
   if (!update || dismissed) return null;
