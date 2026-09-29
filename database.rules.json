@@ -4,11 +4,11 @@
       ".read": "auth != null",
       "$roomId": {
         ".write": "auth != null && ((!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid))",
-        ".validate": "newData.hasChildren(['name', 'description', 'type', 'isPublic', 'memberIds', 'createdBy', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('name').val().length <= 80 && newData.child('description').isString() && newData.child('description').val().length <= 320 && newData.child('type').val() === 'jemaat' && newData.child('isPublic').isBoolean() && newData.child('memberIds').hasChild(auth.uid) && newData.child('createdBy').val() === auth.uid && newData.child('createdAt').isNumber()",
+        ".validate": "newData.hasChildren(['name', 'description', 'type', 'isPublic', 'memberIds', 'createdBy', 'createdAt']) && newData.child('name').isString() && newData.child('name').val().length >= 2 && newData.child('name').val().length <= 80 && newData.child('description').isString() && newData.child('description').val().length <= 320 && newData.child('type').val() === 'jemaat' && newData.child('isPublic').isBoolean() && (data.exists() || newData.child('memberIds').hasChild(auth.uid)) && newData.child('createdBy').val() === auth.uid && newData.child('createdAt').isNumber()",
         "messages": {
           ".read": "auth != null && (root.child('chatRooms').child($roomId).child('isPublic').val() === true || root.child('chatRooms').child($roomId).child('memberIds').hasChild(auth.uid))",
           "$messageId": {
-            ".write": "auth != null && (root.child('chatRooms').child($roomId).child('createdBy').val() === auth.uid || (!data.exists() && newData.child('senderId').val() === auth.uid) || (data.exists() && data.child('senderId').val() === auth.uid))",
+            ".write": "auth != null && (root.child('chatRooms').child($roomId).child('isPublic').val() === true || root.child('chatRooms').child($roomId).child('memberIds').hasChild(auth.uid)) && (root.child('chatRooms').child($roomId).child('createdBy').val() === auth.uid || (!data.exists() && newData.child('senderId').val() === auth.uid) || (data.exists() && data.child('senderId').val() === auth.uid))",
             ".validate": "newData.hasChildren(['senderId', 'senderName', 'text', 'createdAt']) && newData.child('senderId').isString() && newData.child('senderName').isString() && newData.child('senderName').val().length <= 120 && newData.child('text').isString() && newData.child('text').val().length >= 1 && newData.child('text').val().length <= 4000 && newData.child('createdAt').isNumber()"
           }
         }
