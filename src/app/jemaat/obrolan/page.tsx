@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { onValue, push, ref, remove, set, update } from "firebase/database";
-import { MessagesSquare, Plus, Send, Users, X } from "lucide-react";
+import { ArrowLeft, Globe2, LockKeyhole, MessagesSquare, Plus, Search, Send, Users, X } from "lucide-react";
 import { auth, rtdb } from "@/lib/firebase";
 
 type ChatRoom = {
@@ -43,6 +43,9 @@ export default function JemaatChatPage() {
   const [user, setUser] = useState(auth.currentUser);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [showRoomListOnMobile, setShowRoomListOnMobile] = useState(true);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [roomFilter, setRoomFilter] = useState<"all" | "public" | "private">("all");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -70,6 +73,19 @@ export default function JemaatChatPage() {
   }, [user]);
 
   const selectedRoom = useMemo(() => rooms.find((room) => room.id === selectedRoomId) ?? null, [rooms, selectedRoomId]);
+  const visibleRooms = useMemo(() => {
+    const query = roomSearch.trim().toLocaleLowerCase("id");
+    return rooms.filter((room) => {
+      const matchesFilter = roomFilter === "all" || (roomFilter === "public" ? room.isPublic : !room.isPublic);
+      const matchesSearch = !query || `${room.name} ${room.description || ""}`.toLocaleLowerCase("id").includes(query);
+      return matchesFilter && matchesSearch;
+    });
+  }, [rooms, roomFilter, roomSearch]);
+
+  const openRoom = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    setShowRoomListOnMobile(false);
+  };
 
   useEffect(() => {
     if (!user || !selectedRoom || selectedRoom.createdBy !== user.uid || selectedRoom.isPublic) {
@@ -184,20 +200,53 @@ export default function JemaatChatPage() {
       </div>
       {errorMessage && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div>}
 
-      <div className="grid min-h-[34rem] overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white shadow-sm lg:grid-cols-[18rem_1fr]">
-        <aside className="border-b border-emerald-950/10 bg-[#fffdf7] p-4 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-[34rem] overflow-hidden rounded-[2rem] border border-emerald-950/10 bg-white shadow-sm lg:grid-cols-[19rem_1fr]">
+        <aside className={`${showRoomListOnMobile ? "flex" : "hidden"} min-h-[34rem] flex-col border-b border-emerald-950/10 bg-[#fffdf7] p-4 lg:flex lg:border-b-0 lg:border-r`}>
           <div className="flex items-center justify-between px-2 py-2">
-            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Grup tersedia</p><h2 className="mt-1 font-serif text-xl">Obrolan</h2></div>
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Daftar percakapan</p><h2 className="mt-1 font-serif text-xl">Grup jemaat <span className="font-sans text-sm text-emerald-950/45">({rooms.length})</span></h2></div>
             <MessagesSquare className="text-amber-600" size={21} />
           </div>
-          <div className="mt-4 space-y-2">
-            {rooms.map((room) => <div key={room.id} className={`rounded-2xl transition ${selectedRoomId === room.id ? "bg-emerald-900 text-white" : "text-emerald-950/70 hover:bg-emerald-950/5"}`}><button type="button" onClick={() => setSelectedRoomId(room.id)} className="w-full p-3 text-left"><span className="flex items-center gap-2 text-sm font-bold"><Users size={15} />{room.name}</span><span className={`mt-1 block line-clamp-2 text-xs leading-5 ${selectedRoomId === room.id ? "text-emerald-50/70" : "text-emerald-950/50"}`}>{room.description || "Ruang obrolan jemaat"}</span></button>{room.createdBy === user?.uid && <button type="button" onClick={() => void deleteRoom(room)} className={`px-3 pb-3 text-xs font-semibold ${selectedRoomId === room.id ? "text-rose-200" : "text-rose-700"}`}>Hapus grup</button>}</div>)}
-            {rooms.length === 0 && <p className="rounded-2xl border border-dashed border-emerald-950/15 p-4 text-xs leading-5 text-emerald-950/55">Belum ada grup. Buat grup pertama untuk memulai percakapan.</p>}
+          <label className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-950/10 bg-white px-3 py-2.5 text-emerald-950/45 focus-within:border-emerald-700">
+            <Search size={16} aria-hidden="true" />
+            <input value={roomSearch} onChange={(event) => setRoomSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-emerald-950 outline-none placeholder:text-emerald-950/40" placeholder="Cari nama grup" aria-label="Cari nama grup" />
+          </label>
+          <div className="mt-3 flex gap-2" aria-label="Filter grup">
+            {([ ["all", "Semua"], ["public", "Terbuka"], ["private", "Privat"] ] as const).map(([filter, label]) => <button key={filter} type="button" onClick={() => setRoomFilter(filter)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${roomFilter === filter ? "bg-emerald-900 text-white" : "bg-emerald-950/5 text-emerald-950/65 hover:bg-emerald-950/10"}`}>{label}</button>)}
+          </div>
+          <div className="mt-4 flex-1 space-y-2 overflow-y-auto">
+            {visibleRooms.map((room) => {
+              const isSelected = selectedRoomId === room.id;
+              const memberCount = Object.keys(room.memberIds || {}).length;
+              return <button key={room.id} type="button" onClick={() => openRoom(room.id)} aria-current={isSelected ? "true" : undefined} className={`w-full rounded-2xl border p-3.5 text-left transition ${isSelected ? "border-emerald-900 bg-emerald-900 text-white shadow-md shadow-emerald-950/10" : "border-transparent text-emerald-950 hover:border-emerald-950/10 hover:bg-white"}`}>
+                <span className="flex items-start gap-3">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isSelected ? "bg-white/10 text-white" : "bg-emerald-950/5 text-emerald-800"}`}><Users size={17} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">{room.name}</span>
+                    <span className={`mt-1 block line-clamp-2 text-xs leading-5 ${isSelected ? "text-white/70" : "text-emerald-950/55"}`}>{room.description || "Belum ada deskripsi grup."}</span>
+                  </span>
+                </span>
+                <span className={`mt-3 flex items-center justify-between border-t pt-2.5 text-[11px] ${isSelected ? "border-white/15 text-white/75" : "border-emerald-950/5 text-emerald-950/50"}`}>
+                  <span className="inline-flex items-center gap-1.5">{room.isPublic ? <Globe2 size={13} /> : <LockKeyhole size={13} />}{room.isPublic ? "Terbuka" : "Privat"}</span>
+                  <span>{memberCount} anggota</span>
+                </span>
+              </button>;
+            })}
+            {rooms.length === 0 && <div className="rounded-2xl border border-dashed border-emerald-950/15 p-4 text-center"><Users className="mx-auto text-emerald-800/40" size={24} /><p className="mt-2 text-sm font-semibold text-emerald-950">Belum ada grup</p><p className="mt-1 text-xs leading-5 text-emerald-950/55">Buat grup untuk mulai percakapan dengan jemaat.</p></div>}
+            {rooms.length > 0 && visibleRooms.length === 0 && <p className="rounded-2xl border border-dashed border-emerald-950/15 p-4 text-center text-xs leading-5 text-emerald-950/55">Tidak ada grup yang cocok. Coba kata kunci atau filter lain.</p>}
           </div>
         </aside>
 
-        <div className="flex min-h-[34rem] flex-col">
-          <header className="border-b border-emerald-950/10 px-5 py-4"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">{selectedRoom ? (selectedRoom.isPublic ? "Grup publik" : "Grup privat") : "Pilih ruang"}</p><h2 className="mt-1 text-xl font-bold text-slate-950">{selectedRoom?.name || "Belum ada ruang obrolan"}</h2>{selectedRoom?.description && <p className="mt-1 text-sm text-slate-500">{selectedRoom.description}</p>}</div>{selectedRoom?.createdBy === user?.uid && <button type="button" onClick={() => { if (selectedRoom) void deleteRoom(selectedRoom); }} className="shrink-0 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50">Hapus grup</button>}</div>{selectedRoom?.createdBy === user?.uid && !selectedRoom?.isPublic && <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="email" list="jemaat-members" required value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-emerald-500" placeholder="Pilih atau ketik email jemaat" /><datalist id="jemaat-members">{jemaatMembers.map((member) => <option key={member.uid} value={member.email}>{member.nama}</option>)}</datalist><button type="submit" className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Tambah anggota</button></form>}</header>
+        <div className={`${showRoomListOnMobile ? "hidden" : "flex"} min-h-[34rem] flex-col lg:flex`}>
+          <header className="border-b border-emerald-950/10 px-4 py-4 sm:px-5">
+            <div className="flex items-start gap-3">
+              <button type="button" onClick={() => setShowRoomListOnMobile(true)} className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-emerald-950/10 text-emerald-900 lg:hidden" aria-label="Kembali ke daftar grup"><ArrowLeft size={18} /></button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">{selectedRoom?.name || "Pilih grup"}</h2>{selectedRoom && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${selectedRoom.isPublic ? "bg-sky-50 text-sky-800" : "bg-amber-50 text-amber-800"}`}>{selectedRoom.isPublic ? <Globe2 size={12} /> : <LockKeyhole size={12} />}{selectedRoom.isPublic ? "Terbuka" : "Privat"}</span>}</div>
+                <p className="mt-1 text-xs text-slate-500">{selectedRoom?.description || (selectedRoom ? "Percakapan grup jemaat" : "Pilih grup dari daftar untuk melihat percakapan.")}</p>
+              </div>
+              {selectedRoom?.createdBy === user?.uid && <button type="button" onClick={() => { if (selectedRoom) void deleteRoom(selectedRoom); }} className="shrink-0 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50">Hapus</button>}
+            </div>
+            {selectedRoom?.createdBy === user?.uid && !selectedRoom?.isPublic && <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="email" list="jemaat-members" required value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-emerald-500" placeholder="Pilih atau ketik email jemaat" /><datalist id="jemaat-members">{jemaatMembers.map((member) => <option key={member.uid} value={member.email}>{member.nama}</option>)}</datalist><button type="submit" className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Tambah anggota</button></form>}</header>
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#f7f5ef] p-5">
             {messages.map((message) => {
               const isMine = message.senderId === user?.uid;
