@@ -8,6 +8,7 @@ import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_ROLE_MENU_ACCESS, getRoleLabel, normalizeMenuPaths, resolveUserRoles, type UserRole } from "@/lib/roles";
 import { Home, Book, Calendar, Users, Settings, Menu, LogOut, FileText, ClipboardList, BookOpen, Sparkles, ChevronDown, ChevronRight, CircleDollarSign, HandCoins, BadgeDollarSign, Camera, type LucideIcon } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 
 type SidebarMenuItem = {
   name: string;
@@ -181,11 +182,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen grid place-items-center bg-slate-50 text-slate-700">
-        <p>Memeriksa Akses...</p>
-      </div>
-    );
+    return <LoadingScreen label="Memeriksa akses admin" />;
   }
 
   return (

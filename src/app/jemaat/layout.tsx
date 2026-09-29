@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { resolveUserRoles } from "@/lib/roles";
 import { CalendarDays, FileText, Home, LogOut, Menu, MessagesSquare, Newspaper, Quote, X } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 
 const navigation = [
   { href: "/jemaat", label: "Beranda", icon: Home },
@@ -61,7 +62,7 @@ export default function JemaatLayout({ children }: { children: React.ReactNode }
   };
 
   if (isLoading) {
-    return <div className="grid min-h-screen place-items-center bg-[#f7f5ef] text-sm text-emerald-950/70">Memeriksa akses...</div>;
+    return <LoadingScreen label="Memeriksa akses jemaat" />;
   }
 
   return (
