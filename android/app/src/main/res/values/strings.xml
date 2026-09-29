@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GKJW Kucur</string>
+    <string name="title_activity_main">GKJW Kucur</string>
+    <string name="package_name">com.gkjwkucur.app</string>
+    <string name="custom_url_scheme">com.gkjwkucur.app</string>
+</resources>
