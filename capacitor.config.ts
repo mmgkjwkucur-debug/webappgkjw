@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "GKJW Kucur",
   webDir: "public",
   server: {
-    url: "https://webappgkjw.vercel.app",
+    url: "https://webappgkjw.vercel.app/login",
     cleartext: false,
     allowNavigation: ["webappgkjw.vercel.app"],
   },
