@@ -24,6 +24,12 @@ type ChatMessage = {
   createdAt?: number;
 };
 
+type JemaatMember = {
+  uid: string;
+  nama: string;
+  email: string;
+};
+
 function formatTime(value?: ChatMessage["createdAt"]) {
   const date = value ? new Date(value) : null;
   return date ? new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(date) : "baru saja";
@@ -44,6 +50,7 @@ export default function JemaatChatPage() {
   const [roomDescription, setRoomDescription] = useState("");
   const [isPublicRoom, setIsPublicRoom] = useState(false);
   const [memberEmail, setMemberEmail] = useState("");
+  const [jemaatMembers, setJemaatMembers] = useState<JemaatMember[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +70,23 @@ export default function JemaatChatPage() {
   }, [user]);
 
   const selectedRoom = useMemo(() => rooms.find((room) => room.id === selectedRoomId) ?? null, [rooms, selectedRoomId]);
+
+  useEffect(() => {
+    if (!user || !selectedRoom || selectedRoom.createdBy !== user.uid || selectedRoom.isPublic) {
+      return;
+    }
+
+    fetch(`/api/chat/members/list?roomId=${encodeURIComponent(selectedRoom.id)}`)
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Daftar jemaat tidak dapat dimuat.");
+        setJemaatMembers(Array.isArray(body.members) ? body.members : []);
+      })
+      .catch((error) => {
+        console.error("Gagal memuat daftar jemaat:", error);
+        setErrorMessage("Daftar jemaat tidak dapat dimuat.");
+      });
+  }, [selectedRoom, user]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -173,7 +197,7 @@ export default function JemaatChatPage() {
         </aside>
 
         <div className="flex min-h-[34rem] flex-col">
-          <header className="border-b border-emerald-950/10 px-5 py-4"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">{selectedRoom ? (selectedRoom.isPublic ? "Grup publik" : "Grup privat") : "Pilih ruang"}</p><h2 className="mt-1 text-xl font-bold text-slate-950">{selectedRoom?.name || "Belum ada ruang obrolan"}</h2>{selectedRoom?.description && <p className="mt-1 text-sm text-slate-500">{selectedRoom.description}</p>}</div>{selectedRoom?.createdBy === user?.uid && <button type="button" onClick={() => { if (selectedRoom) void deleteRoom(selectedRoom); }} className="shrink-0 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50">Hapus grup</button>}</div>{selectedRoom?.createdBy === user?.uid && !selectedRoom?.isPublic && <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="email" required value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-emerald-500" placeholder="Email anggota baru" /><button type="submit" className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Tambah anggota</button></form>}</header>
+          <header className="border-b border-emerald-950/10 px-5 py-4"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">{selectedRoom ? (selectedRoom.isPublic ? "Grup publik" : "Grup privat") : "Pilih ruang"}</p><h2 className="mt-1 text-xl font-bold text-slate-950">{selectedRoom?.name || "Belum ada ruang obrolan"}</h2>{selectedRoom?.description && <p className="mt-1 text-sm text-slate-500">{selectedRoom.description}</p>}</div>{selectedRoom?.createdBy === user?.uid && <button type="button" onClick={() => { if (selectedRoom) void deleteRoom(selectedRoom); }} className="shrink-0 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50">Hapus grup</button>}</div>{selectedRoom?.createdBy === user?.uid && !selectedRoom?.isPublic && <form onSubmit={addMember} className="mt-4 flex flex-col gap-2 sm:flex-row"><input type="email" list="jemaat-members" required value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-emerald-500" placeholder="Pilih atau ketik email jemaat" /><datalist id="jemaat-members">{jemaatMembers.map((member) => <option key={member.uid} value={member.email}>{member.nama}</option>)}</datalist><button type="submit" className="rounded-xl bg-emerald-900 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Tambah anggota</button></form>}</header>
           <div className="flex-1 space-y-4 overflow-y-auto bg-[#f7f5ef] p-5">
             {messages.map((message) => {
               const isMine = message.senderId === user?.uid;
