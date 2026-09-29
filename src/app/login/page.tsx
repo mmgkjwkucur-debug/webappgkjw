@@ -2,7 +2,11 @@
 import { useState } from "react";
 import { AuthErrorCodes, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { resolveUserRoles } from "@/lib/roles";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 
 function getAuthErrorMessage(error: unknown) {
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -63,7 +67,8 @@ export default function LoginPage() {
         throw new Error(body?.error || "Gagal membuat sesi login.");
       }
 
-      router.push("/admin");
+      const roles = await resolveUserRoles(db, userCredential.user);
+      router.push(roles.length === 1 && roles[0] === "jemaat" ? "/jemaat" : "/admin");
     } catch (error) {
       console.error("Login failed", error);
       setError(error instanceof Error ? error.message : getAuthErrorMessage(error));
@@ -73,19 +78,23 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-screen bg-slate-50 text-slate-900 lg:grid-cols-[minmax(0,1fr)_460px]">
-      <section className="flex min-h-72 items-end bg-[linear-gradient(130deg,rgba(15,23,42,0.9),rgba(79,70,229,0.82)),url('/login-bg.png')] bg-cover bg-center p-8 text-white lg:min-h-screen lg:p-12">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-indigo-200">GKJW Jemaat Kucur</p>
-          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">CMS & Sistem Administrasi</h1>
-          <p className="mt-6 max-w-xl text-base leading-8 text-slate-200">Integrasi penuh untuk administrasi internal dan pusat informasi digital GKJW Jemaat Kucur.</p>
+    <main className="grid min-h-screen place-items-center bg-[#f7f5ef] px-5 py-10 text-slate-900">
+      <section className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <Link href="/" className="inline-flex items-center gap-3 text-emerald-950">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-lg shadow-emerald-950/10">
+              <Image src="/icon.png" alt="GKJW" width={40} height={40} unoptimized className="h-10 w-10 object-contain" />
+            </span>
+            <span className="text-left">
+              <strong className="block font-serif text-xl">GKJW Kucur</strong>
+              <small className="mt-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800/65">Patunggilan Kang Nyawiji</small>
+            </span>
+          </Link>
+          <h1 className="mt-10 text-3xl font-bold tracking-tight text-emerald-950">Masuk ke GKJW Kucur</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">Satu akses untuk jemaat, pengurus, dan pelayan gereja.</p>
         </div>
-      </section>
 
-      <section className="grid place-items-center p-6 sm:p-10">
-        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Login CMS Gereja</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">Masuk menggunakan akun admin yang sudah memiliki role di Firestore.</p>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-emerald-950/5 sm:p-8">
 
         {error && (
           <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-700">

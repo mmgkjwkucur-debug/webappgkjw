@@ -51,3 +51,11 @@ runConfig:
       availability:
         - BUILD
         - RUNTIME
+    - variable: GAS_UPLOAD_URL
+      secret: GAS_UPLOAD_URL
+      availability:
+        - RUNTIME
+    - variable: GAS_UPLOAD_SECRET
+      secret: GAS_UPLOAD_SECRET
+      availability:
+        - RUNTIME

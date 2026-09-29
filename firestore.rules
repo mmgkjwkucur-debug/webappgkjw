@@ -47,7 +47,7 @@ service cloud.firestore {
       return data.roles is list
         && data.roles.size() >= 1
         && data.roles.size() <= 6
-        && data.roles.hasOnly(["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"])
+        && data.roles.hasOnly(["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media", "jemaat"])
         && data.role is string
         && data.role in data.roles
         && (!("menuAccess" in data) || (data.menuAccess is list && data.menuAccess.size() <= 50));
@@ -71,13 +71,23 @@ service cloud.firestore {
     }
 
     function isValidPost(data) {
-      return data.keys().hasOnly(["judul", "ringkasan", "isi", "status", "tanggal", "authorRole"])
+      return data.keys().hasOnly(["judul", "slug", "kategori", "tags", "ringkasan", "isi", "fotoUrl", "fotoDriveId", "videoUrl", "dokumenUrl", "dokumenDriveId", "status", "isFeatured", "tanggal", "updatedAt", "authorRole"])
         && data.keys().hasAll(["judul", "ringkasan", "isi", "status", "tanggal", "authorRole"])
         && data.judul is string
+        && (!('slug' in data) || (data.slug is string && data.slug.size() <= 140))
+        && (!('kategori' in data) || data.kategori in ["Warta Jemaat", "Pelayanan", "Kegiatan", "Pengumuman", "Umum"])
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 10))
         && data.ringkasan is string
         && data.isi is string
+        && (!('fotoUrl' in data) || (data.fotoUrl is string && data.fotoUrl.size() <= 1000))
+        && (!('fotoDriveId' in data) || (data.fotoDriveId is string && data.fotoDriveId.size() <= 200))
+        && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 1000))
+        && (!('dokumenUrl' in data) || (data.dokumenUrl is string && data.dokumenUrl.size() <= 1000))
+        && (!('dokumenDriveId' in data) || (data.dokumenDriveId is string && data.dokumenDriveId.size() <= 200))
         && data.status in ["draft", "published"]
+        && (!('isFeatured' in data) || data.isFeatured is bool)
         && data.tanggal is string
+        && (!('updatedAt' in data) || data.updatedAt is string)
         && data.authorRole is string
         && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
         && data.judul.size() >= 3
@@ -110,7 +120,7 @@ service cloud.firestore {
         && data.isi is string
         && data.tanggal is string
         && data.authorRole is string
-        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"]
+        && data.authorRole in ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media", "jemaat"]
         && data.createdAt is string
         && data.updatedAt is string
         && data.judul.size() >= 3
@@ -275,6 +285,56 @@ service cloud.firestore {
       allow get, list: if signedIn() && isStaff();
       allow create, update: if signedIn() && isStaff();
       allow delete: if signedIn() && userHasRole("admin");
+    }
+
+    function canReadChatRoom(roomId) {
+      let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+      return room.isPublic == true
+        || (room.memberIds is list && request.auth.uid in room.memberIds);
+    }
+
+    function canManageChatRoom(roomId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/chatRooms/$(roomId)).data.createdBy == request.auth.uid;
+    }
+
+    match /chatRooms/{roomId} {
+      allow get, list: if signedIn()
+        && (resource.data.isPublic == true
+          || (resource.data.memberIds is list && request.auth.uid in resource.data.memberIds));
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["name", "description", "type", "isPublic", "memberIds", "createdBy", "createdAt"])
+        && request.resource.data.keys().hasAll(["name", "description", "type", "isPublic", "memberIds", "createdBy", "createdAt"])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 320
+        && request.resource.data.type == "jemaat"
+        && request.resource.data.isPublic is bool
+        && request.resource.data.memberIds is list
+        && request.resource.data.memberIds.size() >= 1
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+
+      match /messages/{messageId} {
+        allow get, list: if signedIn() && canReadChatRoom(roomId);
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(["senderId", "senderName", "text", "createdAt"])
+          && request.resource.data.keys().hasAll(["senderId", "senderName", "text", "createdAt"])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName is string
+          && request.resource.data.senderName.size() <= 120
+          && request.resource.data.text is string
+          && request.resource.data.text.size() >= 1
+          && request.resource.data.text.size() <= 4000
+          && request.resource.data.createdAt is timestamp;
+        allow update: if signedIn() && resource.data.senderId == request.auth.uid;
+        allow delete: if signedIn()
+          && (resource.data.senderId == request.auth.uid || canManageChatRoom(roomId));
+      }
     }
   }
 }

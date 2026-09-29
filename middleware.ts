@@ -9,6 +9,8 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith("/admin/") ||
     pathname === "/kas" ||
     pathname.startsWith("/kas/") ||
+    pathname === "/jemaat" ||
+    pathname.startsWith("/jemaat/") ||
     pathname === "/jadwal/scanner" ||
     pathname.startsWith("/jadwal/scanner/")
   );
@@ -33,5 +35,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/kas/:path*", "/jadwal/scanner", "/jadwal/scanner/:path*"],
+  matcher: ["/admin/:path*", "/kas/:path*", "/jemaat/:path*", "/jadwal/scanner", "/jadwal/scanner/:path*"],
 };

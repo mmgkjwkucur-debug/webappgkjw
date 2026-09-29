@@ -31,6 +31,11 @@ export const ROLE_OPTIONS = [
     label: "Multi Media",
     description: "Mengelola artikel, konten publik, jadwal, dan media digital.",
   },
+  {
+    id: "jemaat",
+    label: "Jemaat",
+    description: "Mengakses informasi ibadah, warta, renungan, dan layanan jemaat.",
+  },
 ] as const;
 
 export type UserRole = (typeof ROLE_OPTIONS)[number]["id"];
@@ -115,6 +120,7 @@ export const DEFAULT_ROLE_MENU_ACCESS: RoleMenuAccessMap = {
     "/admin/pengeluaran-kas",
     "/admin/buku-kas-umum",
   ],
+  jemaat: [],
 };
 
 export function getRoleLabel(role: string) {

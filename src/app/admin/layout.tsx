@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -7,7 +7,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_ROLE_MENU_ACCESS, getRoleLabel, normalizeMenuPaths, resolveUserRoles, type UserRole } from "@/lib/roles";
-import { Home, Book, Calendar, Users, Settings, Menu, LogOut, FileText, ClipboardList, BookOpen, Sparkles, ChevronDown, ChevronRight, CircleDollarSign, HandCoins, HeartHandshake, Wallet, BadgeDollarSign, Camera, type LucideIcon } from "lucide-react";
+import { Home, Book, Calendar, Users, Settings, Menu, LogOut, FileText, ClipboardList, BookOpen, Sparkles, ChevronDown, ChevronRight, CircleDollarSign, HandCoins, BadgeDollarSign, Camera, type LucideIcon } from "lucide-react";
 
 type SidebarMenuItem = {
   name: string;
@@ -28,6 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [allowedMenuPaths, setAllowedMenuPaths] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -101,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
+  const navRef = useRef<HTMLElement | null>(null);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(
     pathname?.startsWith("/admin/pengeluaran-kas")
       ? "Pengeluaran Kas"
@@ -112,6 +114,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             ? "Sekretariat & Surat"
             : null,
   );
+
+  useEffect(() => {
+    const activeMenu = navRef.current?.querySelector<HTMLElement>("[data-active-menu='true']");
+    activeMenu?.scrollIntoView({ block: "nearest" });
+  }, [pathname, expandedMenu]);
 
   const menuItems: SidebarMenuItem[] = [
     { name: "Dashboard", path: "/admin", icon: Home, roles: ["admin", "sekretariat", "bendahara", "phmj", "majelis", "multi_media"] },
@@ -182,7 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f5ef] text-slate-900 md:grid md:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="min-h-screen bg-[#f7f5ef] text-slate-900 md:grid md:grid-cols-[5rem_minmax(0,1fr)]">
       <div
         className={`fixed inset-0 z-20 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300 md:hidden ${mobileNavOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         onClick={() => setMobileNavOpen(false)}
@@ -190,20 +197,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-emerald-950 text-slate-100 transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}
+        onMouseEnter={() => setIsSidebarExpanded(true)}
+        onMouseLeave={() => setIsSidebarExpanded(false)}
+        onFocus={() => setIsSidebarExpanded(true)}
+        className={`fixed inset-y-0 left-0 z-30 w-72 transform overflow-hidden bg-emerald-950 text-slate-100 transition-[width,transform] duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 ${isSidebarExpanded ? "md:w-72" : "md:w-20"} ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="flex min-h-screen flex-col border-r border-emerald-900/80 bg-emerald-950/95 shadow-2xl md:border-none md:bg-emerald-950 md:overflow-y-auto">
-          <div className="flex items-center gap-3 border-b border-slate-800/70 p-6">
+        <div className="flex h-screen min-h-0 flex-col border-r border-emerald-900/80 bg-emerald-950/95 shadow-2xl md:border-none md:bg-emerald-950">
+          <div className="flex shrink-0 items-center gap-3 border-b border-slate-800/70 p-6">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-950 shadow-lg">
               <Image src="/icon.png" alt="GKJW" width={40} height={40} unoptimized className="h-full w-full object-contain" />
             </div>
-            <div>
-              <h2 className="text-base font-semibold uppercase tracking-[0.24em] text-white">GKJW</h2>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Jemaat Kucur</p>
+            <div className={`min-w-0 transition-opacity duration-200 ${isSidebarExpanded ? "opacity-100" : "md:w-0 md:overflow-hidden md:opacity-0"}`}>
+              <h2 className="whitespace-nowrap text-base font-semibold uppercase tracking-[0.24em] text-white">GKJW</h2>
+              <p className="whitespace-nowrap text-xs uppercase tracking-[0.24em] text-slate-400">Jemaat Kucur</p>
             </div>
           </div>
 
-          <nav className="flex-1 space-y-2 overflow-y-auto p-4">
+          <nav ref={navRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4 [scrollbar-color:rgba(167,243,208,0.3)_transparent]">
             {menuItems
               .filter((item) => {
                 const childVisible = item.children?.some((child) => canAccessMenu(child.path)) ?? false;
@@ -223,14 +233,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="flex items-center gap-3 rounded-2xl border border-transparent transition-all duration-200 hover:border-slate-700/20">
                       <Link
                         href={item.path ?? "/"}
+                        data-active-menu={isActive ? "true" : undefined}
                         className={`${base} ${isActive ? activeCls : inactive} flex-1`}
                         onClick={() => setMobileNavOpen(false)}
                       >
                         <item.icon {...itemIconProps} />
-                        <span className="truncate">{item.name}</span>
+                        <span className={`truncate transition-opacity duration-200 ${isSidebarExpanded ? "opacity-100" : "md:w-0 md:opacity-0"}`}>{item.name}</span>
                       </Link>
 
-                      {item.children ? (
+                      {item.children && (isSidebarExpanded || mobileNavOpen) ? (
                         <button
                           type="button"
                           className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-emerald-100 transition hover:bg-white/15"
@@ -267,14 +278,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               })}
           </nav>
 
-          <div className="border-t border-slate-800/70 p-4">
+          <div className="shrink-0 border-t border-slate-800/70 p-4">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-white">
                 {userName.charAt(0).toUpperCase()}
               </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-white">{userName}</div>
-                <div className="truncate text-xs text-slate-400">{userRoles.map(getRoleLabel).join(", ")}</div>
+              <div className={`min-w-0 transition-opacity duration-200 ${isSidebarExpanded ? "opacity-100" : "md:w-0 md:overflow-hidden md:opacity-0"}`}>
+                <div className="truncate whitespace-nowrap text-sm font-semibold text-white">{userName}</div>
+                <div className="truncate whitespace-nowrap text-xs text-slate-400">{userRoles.map(getRoleLabel).join(", ")}</div>
               </div>
               <button onClick={handleLogout} className="ml-auto rounded-full p-2 text-slate-300 transition hover:text-white">
                 <LogOut size={16} />

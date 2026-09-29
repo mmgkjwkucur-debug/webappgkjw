@@ -1,15 +1,24 @@
 export type PostStatus = "draft" | "published";
+export type PostCategory = "Warta Jemaat" | "Pelayanan" | "Kegiatan" | "Pengumuman" | "Umum";
 
 export type ChurchPost = {
   id: string;
   judul: string;
+  slug?: string;
+  kategori?: PostCategory;
+  tags?: string[];
   ringkasan: string;
   isi: string;
   fotoUrl?: string;
+  fotoDriveId?: string;
   videoUrl?: string;
+  dokumenUrl?: string;
+  dokumenDriveId?: string;
   status: PostStatus;
+  isFeatured?: boolean;
   tanggal: string;
-  authorRole: "admin";
+  updatedAt?: string;
+  authorRole: string;
 };
 
 export type WorshipSchedule = {
@@ -51,4 +60,11 @@ export function formatDate(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "full",
   }).format(new Date(value));
+}
+
+export function getPostImageSrc(post: Pick<ChurchPost, "fotoDriveId" | "fotoUrl">) {
+  if (post.fotoDriveId) return `/api/media?fileId=${encodeURIComponent(post.fotoDriveId)}`;
+  const legacyFileId = post.fotoUrl?.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ?? post.fotoUrl?.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+  if (legacyFileId) return `/api/media?fileId=${encodeURIComponent(legacyFileId)}`;
+  return post.fotoUrl ?? "";
 }

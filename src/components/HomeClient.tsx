@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, CalendarDays, MapPin, Newspaper, X } from "lucide-react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ChurchPost, PublicMenu, WorshipSchedule, formatDate } from "@/lib/cms";
+import { ChurchPost, PublicMenu, WorshipSchedule, formatDate, getPostImageSrc } from "@/lib/cms";
 import { PublicFooter, PublicHeader } from "@/components/PublicChrome";
 
 export default function HomeClient() {
@@ -94,6 +95,7 @@ export default function HomeClient() {
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
             {latestPosts.length > 0 ? latestPosts.map((post, index) => (
               <button key={post.id} type="button" onClick={() => setSelectedPost(post)} className={`group rounded-[2rem] p-7 text-left transition hover:-translate-y-1 ${index === 0 ? "bg-emerald-900 text-white shadow-xl shadow-emerald-950/20" : "border border-emerald-950/10 bg-white hover:border-emerald-700/30"}`}>
+                {getPostImageSrc(post) && <Image src={getPostImageSrc(post)} alt={post.judul} width={1200} height={630} unoptimized className="mb-6 aspect-[1.9/1] w-full rounded-2xl object-cover" />}
                 <Newspaper size={20} className={index === 0 ? "text-amber-300" : "text-emerald-700"} /><time className={`mt-8 block text-xs font-bold uppercase tracking-[0.2em] ${index === 0 ? "text-emerald-100/65" : "text-emerald-800/60"}`}>{formatDate(post.tanggal)}</time><h3 className="mt-3 font-serif text-2xl leading-tight">{post.judul}</h3><p className={`mt-4 line-clamp-3 text-sm leading-7 ${index === 0 ? "text-emerald-50/75" : "text-emerald-950/65"}`}>{post.ringkasan}</p><span className={`mt-7 inline-flex items-center gap-2 text-sm font-bold ${index === 0 ? "text-amber-200" : "text-emerald-800"}`}>Baca selengkapnya <ArrowRight size={15} /></span>
               </button>
             )) : <div className="rounded-3xl border border-dashed border-emerald-950/20 bg-white p-8 text-sm leading-7 text-emerald-950/60">Belum ada artikel publik yang diterbitkan.</div>}
@@ -105,7 +107,7 @@ export default function HomeClient() {
 
       <section id="jadwal" className="bg-emerald-900 py-16 text-white lg:py-24"><div className="mx-auto max-w-7xl px-5 lg:px-8"><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">Jadwal Pelayanan</p><h2 className="mt-4 font-serif text-4xl sm:text-5xl">Mari hadir & bersekutu</h2></div><CalendarDays className="text-amber-300" size={34} /></div><div className="mt-10 grid gap-4">{upcomingSchedules.length > 0 ? upcomingSchedules.map((schedule) => <article key={schedule.id} className="grid gap-4 rounded-3xl border border-white/10 bg-white/8 p-6 sm:grid-cols-[150px_1fr_auto] sm:items-center"><time className="text-sm font-bold text-amber-200">{formatDate(schedule.tanggal)}</time><div><h3 className="text-xl font-bold">{schedule.judul}</h3><p className="mt-2 flex items-center gap-2 text-sm text-emerald-50/70"><MapPin size={15} /> {schedule.lokasi}</p></div><p className="text-lg font-bold text-amber-100 sm:text-right">{schedule.waktu}</p></article>) : <p className="rounded-3xl border border-dashed border-white/20 p-8 text-emerald-50/70">Belum ada jadwal yang diterbitkan.</p>}</div></div></section>
 
-      {selectedPost && <div className="fixed inset-0 z-50 grid place-items-center bg-emerald-950/70 p-5 backdrop-blur-sm" onClick={() => setSelectedPost(null)}><article className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-[#fffdf7] p-7 shadow-2xl sm:p-10" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelectedPost(null)} className="ml-auto grid h-10 w-10 place-items-center rounded-full bg-emerald-950 text-white"><X size={18} /></button><time className="mt-6 block text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">{formatDate(selectedPost.tanggal)}</time><h2 className="mt-4 font-serif text-4xl leading-tight">{selectedPost.judul}</h2><p className="mt-5 font-medium leading-7 text-emerald-950/70">{selectedPost.ringkasan}</p><div className="mt-8 whitespace-pre-wrap leading-8 text-emerald-950/75">{selectedPost.isi}</div></article></div>}
+      {selectedPost && <div className="fixed inset-0 z-50 grid place-items-center bg-emerald-950/70 p-5 backdrop-blur-sm" onClick={() => setSelectedPost(null)}><article className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-[#fffdf7] p-7 shadow-2xl sm:p-10" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelectedPost(null)} className="ml-auto grid h-10 w-10 place-items-center rounded-full bg-emerald-950 text-white"><X size={18} /></button>{getPostImageSrc(selectedPost) && <Image src={getPostImageSrc(selectedPost)} alt={selectedPost.judul} width={1400} height={735} unoptimized className="mt-6 aspect-[1.9/1] w-full rounded-2xl object-cover" />}<time className="mt-6 block text-xs font-bold uppercase tracking-[0.22em] text-emerald-700">{formatDate(selectedPost.tanggal)}</time><h2 className="mt-4 font-serif text-4xl leading-tight">{selectedPost.judul}</h2><p className="mt-5 font-medium leading-7 text-emerald-950/70">{selectedPost.ringkasan}</p><div className="mt-8 whitespace-pre-wrap leading-8 text-emerald-950/75" dangerouslySetInnerHTML={{ __html: selectedPost.isi }} /></article></div>}
       <PublicFooter />
     </main>
   );
