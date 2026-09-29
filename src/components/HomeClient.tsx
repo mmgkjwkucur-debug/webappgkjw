@@ -56,20 +56,20 @@ export default function HomeClient() {
         <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:px-8 lg:py-28">
           <div className="self-center">
             <p className="text-xs font-bold uppercase tracking-[0.32em] text-amber-300">GKJW Jemaat Kucur</p>
-            <h1 className="mt-6 max-w-3xl font-serif text-5xl leading-[0.98] sm:text-6xl lg:text-7xl">Iman yang bertumbuh. Kasih yang menghidupkan.</h1>
+            <h1 className="!text-white mt-6 max-w-3xl font-serif text-5xl leading-[0.98] sm:text-6xl lg:text-7xl">Iman yang bertumbuh. Kasih yang menghidupkan.</h1>
             <p className="mt-7 max-w-xl text-base leading-8 text-emerald-50/75 sm:text-lg">Ruang bersama untuk beribadah, saling menguatkan, dan menjadi berkat bagi lingkungan sekitar.</p>
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
               <a href="#jadwal" className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-300 px-6 py-3.5 text-sm font-bold text-emerald-950 transition hover:bg-amber-200">Lihat Jadwal Ibadah <ArrowRight size={16} /></a>
               <Link href="/tentang-kami" className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-white/10">Mengenal Kami</Link>
             </div>
           </div>
-          <aside className="rounded-[2rem] border border-white/10 bg-white/10 p-6 shadow-2xl shadow-black/10 backdrop-blur-sm sm:p-8">
+          <aside className="self-start rounded-[2rem] border border-white/10 bg-white/10 p-6 shadow-2xl shadow-black/10 backdrop-blur-sm sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Minggu Ini</p>
             <div className="mt-7 space-y-5">
               {upcomingSchedules.slice(0, 2).map((schedule) => (
                 <div key={schedule.id} className="border-b border-white/10 pb-5 last:border-0 last:pb-0">
                   <p className="text-sm font-semibold text-amber-200">{formatDate(schedule.tanggal)}</p>
-                  <h2 className="mt-2 text-xl font-bold">{schedule.judul}</h2>
+                  <h2 className="!text-white mt-2 text-xl font-bold">{schedule.judul}</h2>
                   <p className="mt-2 flex items-center gap-2 text-sm text-emerald-50/70"><MapPin size={15} /> {schedule.lokasi}</p>
                 </div>
               ))}
